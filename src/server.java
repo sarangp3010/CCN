@@ -1,4 +1,3 @@
-package src;
 import java.net.*;
 
 public class server {
@@ -12,11 +11,26 @@ public class server {
         String protocol = args[1].toString();
         System.out.println("Hello Server" + port + protocol);
 
-        try {
-            ServerSocket ss = new ServerSocket(port);
-            System.out.print("Server listning on port " + port);
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (protocol == "tcp") {
+
+        } else if (protocol == "snw") {
+
+        } else {
+            System.out.println("From the Server Server");
+            System.out.println("Invalid protocol");
         }
+        // try {
+        // // ServerSocket ss = new ServerSocket(port);
+        // System.out.print("Server listning on port " + port);
+
+        // while (true) {
+        // // Socket clientSocket = ss.accept();
+        // // System.out.println("Client connected: " +
+        // clientSocket.getInetAddress().getHostAddress());
+
+        // }
+        // } catch (Exception e) {
+        // e.printStackTrace();
+        // }
     }
 }
