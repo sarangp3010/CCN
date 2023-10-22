@@ -6,6 +6,7 @@ public class client {
     private static Socket cache_tcp = null;
     private static DatagramSocket server_udp = null;
     private static DatagramSocket cache_udp = null;
+    private static DatagramSocket client_udp = null;
 
     // public client(String ip, int port) throws Exception {
     // server_tcp = new Socket(ip, port);
@@ -45,6 +46,8 @@ public class client {
         BufferedReader buf_reader = new BufferedReader(new InputStreamReader(System.in));
         String command = "";
         try {
+            cache_tcp = new Socket(cache_ip, cache_port);
+            client_udp = new DatagramSocket();
             do {
                 System.out.print("Enter command: ");
                 command = buf_reader.readLine();
@@ -58,18 +61,28 @@ public class client {
                         System.out.println("Invalid protocol");
                     }
                 } else if (command.startsWith("get")) {
-                    cache_tcp = new Socket(cache_ip, cache_port);
-                    // server_tcp = new Socket(server_ip, server_port);
-                    // cache_udp = new DatagramSocket(cache_port);
                     if (protocol.equals("tcp")) {
+                        
                         PrintWriter out = new PrintWriter(cache_tcp.getOutputStream(), true);
                         out.println(command);
-                        
+
                         BufferedReader in = new BufferedReader(new InputStreamReader(cache_tcp.getInputStream()));
                         String msg = in.readLine();
                         System.out.println("msg : " + msg);
                     } else if (protocol.equals("snw")) {
                         
+                        byte[] sendData;
+                        sendData = command.getBytes();
+                        DatagramPacket cache_udp_packets = new DatagramPacket(sendData, sendData.length,
+                                InetAddress.getByName(cache_ip), cache_port);
+                        client_udp.send(cache_udp_packets);
+
+                        byte[] receiveData = new byte[1024];
+                        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+                        client_udp.receive(receivePacket);
+
+                        String receivedString = new String(receivePacket.getData(), 0, receivePacket.getLength());
+                        System.out.println("Received from server: " + receivedString);
                     } else {
                         System.out.println("From the Cleint Server");
                         System.out.println("Invalid protocol");

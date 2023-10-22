@@ -16,19 +16,20 @@ public class server {
         int port = Integer.parseInt(args[0]);
         String protocol = args[1].toString();
         System.out.println("Hello Server" + port + protocol);
-
+        
         try {
             server_tcp = new ServerSocket(port);
-
+            server_udp = new DatagramSocket(port);
             while (true) {
-                Socket client_socket = server_tcp.accept();
-                PrintWriter out = new PrintWriter(client_socket.getOutputStream(), true);
+                if (protocol.equals("tcp")) {
+                    
+                    Socket client_socket = server_tcp.accept();
+                    PrintWriter out = new PrintWriter(client_socket.getOutputStream(), true);
 
-                BufferedReader in = new BufferedReader(new InputStreamReader(client_socket.getInputStream()));
-                String command = in.readLine();
-                System.out.println(" command ::  " + command);
-                if (command != null) {
-                    if (protocol.equals("tcp")) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(client_socket.getInputStream()));
+                    String command = in.readLine();
+                    System.out.println(" command ::  " + command);
+                    if (command != null) {
                         if (command.startsWith("get")) {
                             String file_name = command.split(" ")[1];
                             if (server_files.indexOf(file_name) != -1) {
@@ -42,21 +43,43 @@ public class server {
                         } else {
                             System.out.println("From server: Invalid command");
                         }
-                    } else if (protocol.equals("snw")) {
-                        server_udp = new DatagramSocket(port);
-                        // DatagramPacket udp_packet = new DatagramPacket(new byte[1024], 1024);
-                        // DatagramSocket udp_out = (udp_packet != null) ? new DatagramSocket() : null;
-                        // InetAddress addr = (udp_packet != null) ? udp_packet.getAddress() : null;
-                        // int clientPort = (udp_packet != null) ? udp_packet.getPort() : -1;
-
-                        // System.out.println("From server: addr: " + addr);
-                        // System.out.println("From server: clientPort: " + clientPort);
-                    } else {
-                        System.out.println("From the Server Server");
-                        System.out.println("Invalid protocol");
                     }
-                }
+                } else if (protocol.equals("snw")) {
+                    
+                    byte[] receiveData = new byte[1024];
+                    DatagramPacket server_receive_udp_packet = new DatagramPacket(receiveData, receiveData.length);
+                    server_udp.receive(server_receive_udp_packet);
+                    String command = new String(server_receive_udp_packet.getData(), 0,
+                            server_receive_udp_packet.getLength());
+                    System.out.println("receive at server: " + command);
+                    if (command.startsWith("get")) {
+                        String file_name = command.split(" ")[1];
+                        System.out.println("Filename: " + file_name);
+                        InetAddress cache_addr = server_receive_udp_packet.getAddress();
+                        int cache_port = server_receive_udp_packet.getPort();
+                        System.out.println("Cache data : address: \n\n" + cache_addr + " port : " + cache_port);
+                        if (server_files.indexOf(file_name) != -1) {
+                            
+                            byte[] sendData = "File Deliver from Origin".getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, cache_addr,
+                                    cache_port);
+                            server_udp.send(sendPacket);
+                        } else {
+                            server_files.add(file_name);
+                            byte[] sendData = "File Not Found in origin".getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, cache_addr,
+                                    cache_port);
+                            server_udp.send(sendPacket);
+                        }
+                    } else if (command.startsWith("put")) {
 
+                    } else {
+                        System.out.println("From server: Invalid command");
+                    }
+                } else {
+                    System.out.println("From the Server Server");
+                    System.out.println("Invalid protocol");
+                }
             }
 
         } catch (IOException e) {

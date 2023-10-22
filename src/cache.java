@@ -22,25 +22,25 @@ public class cache {
         System.out.println("protocol" + protocol);
         try {
             cache_tcp = new ServerSocket(port);
-
+            cache_udp = new DatagramSocket(port);
             while (true) {
                 try {
-                    Socket serverClientSocket = cache_tcp.accept();
-                    PrintWriter serverOut = (serverClientSocket != null)
-                            ? new PrintWriter(serverClientSocket.getOutputStream(), true)
-                            : null;
-                    BufferedReader serverIn = (serverClientSocket != null)
-                            ? new BufferedReader(new InputStreamReader(serverClientSocket.getInputStream()))
-                            : null;
-
-                    Socket server_tcp = new Socket(server_ip, server_port);
-                    PrintWriter server_out = new PrintWriter(server_tcp.getOutputStream(), true);
-
-                    BufferedReader server_in = new BufferedReader(
-                            new InputStreamReader(server_tcp.getInputStream()));
-
-                    String command = (serverIn != null) ? serverIn.readLine() : null;
                     if (protocol.equals("tcp")) {
+                        Socket serverClientSocket = cache_tcp.accept();
+                        PrintWriter serverOut = (serverClientSocket != null)
+                                ? new PrintWriter(serverClientSocket.getOutputStream(), true)
+                                : null;
+                        BufferedReader serverIn = (serverClientSocket != null)
+                                ? new BufferedReader(new InputStreamReader(serverClientSocket.getInputStream()))
+                                : null;
+
+                        Socket server_tcp = new Socket(server_ip, server_port);
+                        PrintWriter server_out = new PrintWriter(server_tcp.getOutputStream(), true);
+
+                        BufferedReader server_in = new BufferedReader(
+                                new InputStreamReader(server_tcp.getInputStream()));
+
+                        String command = (serverIn != null) ? serverIn.readLine() : null;
                         if (command.startsWith("get")) {
                             String file_name = command.split(" ")[1];
                             if (cache_files.indexOf(file_name) != -1) {
@@ -59,24 +59,50 @@ public class cache {
                         }
                         serverIn.close();
                         server_in.close();
-                        // server_out.close();
-                        // serverOut.close();
-                        // serverClientSocket.close();
                     } else if (protocol.equals("snw")) {
-                        // cache_udp = new DatagramSocket(port);
-                        // DatagramPacket snwPacket = new DatagramPacket(new byte[1024], 1024);
-                        // DatagramSocket snwOutSocket = (snwPacket != null) ? new DatagramSocket() :
-                        // null;
-                        // InetAddress serverAddress = (snwPacket != null) ?
-                        // InetAddress.getByName(server_ip) : null;
-                        // int serverPortNumber = (snwPacket != null) ? server_port : -1;
+                        byte[] cache_received_data = new byte[1024];
+                        DatagramPacket cache_receive_udp_packet = new DatagramPacket(cache_received_data, cache_received_data.length);
+                        cache_udp.receive(cache_receive_udp_packet);
+
+                        String command = new String(cache_receive_udp_packet.getData(), 0,
+                            cache_receive_udp_packet.getLength());
+                        
+                        System.out.println("Cache Received from cleint: " + command);
+
+                        String file_name = command.split(" ")[1];
+                        if (cache_files.indexOf(file_name) != -1) {
+
+                        } else {
+
+                        }
+
+                        InetAddress client_addr = cache_receive_udp_packet.getAddress();
+                        int client_port = cache_receive_udp_packet.getPort();
+
+                        System.out.println("Client data : address: \n\n" + client_addr + " port : " + client_port);
+
+                        // DatagramSocket server_udp = new DatagramSocket();
+                        byte[] sendData = command.getBytes();
+                        DatagramPacket server_udp_packets = new DatagramPacket(sendData, sendData.length,
+                                InetAddress.getByName(server_ip), server_port);
+                        cache_udp.send(server_udp_packets);
+                        System.out.println("Called here");
+// ------------------------ stop here ----------------------------
+                        byte[] client_receive_data = new byte[1024];
+                        DatagramPacket client_receive_packet = new DatagramPacket(client_receive_data, client_receive_data.length);
+                        cache_udp.receive(client_receive_packet);
+                        System.out.println("client_receive_data from server in cache: " + new String(client_receive_packet.getData(), 0, client_receive_packet.getLength()));
+
+                        byte[] client_send_data = client_receive_data;
+                        DatagramPacket client_send_packet = new DatagramPacket(client_send_data, client_send_data.length, client_addr, client_port);
+                        cache_udp.send(client_send_packet);
+
+                        String receivedString = new String(client_send_packet.getData(), 0, client_send_packet.getLength());
+                        System.out.println("Cache Received from server: " + receivedString);
                     } else {
                         System.out.println("From the Cache Server");
                         System.out.println("Invalid protocol");
                     }
-                    // serverOut.close();
-                    // serverIn.close();
-                    // cache_tcp.close();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
