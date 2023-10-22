@@ -31,8 +31,6 @@ public class cache {
                                 ? new BufferedReader(new InputStreamReader(server_client_socket.getInputStream()))
                                 : null;
 
-                        Socket server_tcp = new Socket(server_ip, server_port);
-
                         String command = (server_in != null) ? server_in.readLine() : null;
                         System.out.println("Command: " + command);
                         if (command.startsWith("get")) {
@@ -40,9 +38,9 @@ public class cache {
                             if (cache_files.indexOf(file_name) != -1) {
                                 tcp_transport.send_command(server_client_socket, "File Delivered from cache");
                             } else {
+                                Socket server_tcp = new Socket(server_ip, server_port);
                                 tcp_transport.send_command(server_tcp, command);
                                 cache_files.add(file_name);
-
                                 String msg = tcp_transport.receive_command(server_tcp);
                                 tcp_transport.send_command(server_client_socket, msg);
                             }
@@ -61,30 +59,14 @@ public class cache {
                         String file_name = command.split(" ")[1];
 
                         if (cache_files.indexOf(file_name) != -1) {
-                            byte[] client_send_data = "File Delivered from cache".getBytes();
-                            DatagramPacket client_send_packet = new DatagramPacket(client_send_data,
-                                    client_send_data.length, client_addr, client_port);
-                            cache_udp.send(client_send_packet);
+                            snw_transport.send_command(cache_udp, client_addr, client_port, "File Delivered from cache");
                         } else {
                             cache_files.add(file_name);
-                            byte[] sendData = command.getBytes();
-                            DatagramPacket server_udp_packets = new DatagramPacket(sendData, sendData.length,
-                                    InetAddress.getByName(server_ip), server_port);
-                            cache_udp.send(server_udp_packets);
+                            snw_transport.send_command(cache_udp, InetAddress.getByName(server_ip), server_port, command);
 
-                            byte[] client_receive_data = new byte[1024];
-                            DatagramPacket client_receive_packet = new DatagramPacket(client_receive_data,
-                                    client_receive_data.length);
-                            cache_udp.receive(client_receive_packet);
+                            String client_receive = snw_transport.receive_command(cache_udp);
 
-                            byte[] client_send_data = client_receive_data;
-                            DatagramPacket client_send_packet = new DatagramPacket(client_send_data,
-                                    client_send_data.length, client_addr, client_port);
-                            cache_udp.send(client_send_packet);
-
-                            String receivedString = new String(client_send_packet.getData(), 0,
-                                    client_send_packet.getLength());
-                            System.out.println("Cache Received from server: " + receivedString);
+                            snw_transport.send_command(cache_udp, client_addr, client_port, client_receive);
                         }
 
                     } else {

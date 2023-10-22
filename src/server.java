@@ -30,6 +30,7 @@ public class server {
                     if (command != null) {
                         if (command.startsWith("get")) {
                             String file_name = command.split(" ")[1];
+                            System.out.println("Called");
                             if (server_files.indexOf(file_name) != -1) {
                                 tcp_transport.send_command(client_socket, "File Deliver from Origin");
                             } else {
@@ -37,7 +38,7 @@ public class server {
                                 tcp_transport.send_command(client_socket, "File Not Found in origin");
                             }
                         } else if (command.startsWith("put")) {
-
+                            // Nothing to do 
                         } else {
                             System.out.println("From server: Invalid command");
                         }
@@ -76,6 +77,7 @@ public class server {
                 } else {
                     System.out.println("From the Server Server");
                     System.out.println("Invalid protocol");
+                    break;
                 }
             }
 

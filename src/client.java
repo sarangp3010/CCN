@@ -34,7 +34,9 @@ public class client {
                 command = buf_reader.readLine();
                 if (command.startsWith("put")) {
                     if (protocol.equals("tcp")) {
-
+                        server_tcp = new Socket(server_ip, server_port);
+                        String file_path = command.split(" ")[1];
+                        tcp_transport.sendFile(server_tcp, file_path);
                     } else if (protocol.equals("snw")) {
 
                     } else {
