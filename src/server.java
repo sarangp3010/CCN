@@ -16,15 +16,13 @@ public class server {
         int port = Integer.parseInt(args[0]);
         String protocol = args[1].toString();
         System.out.println("Hello Server" + port + protocol);
-        
+
         try {
             server_tcp = new ServerSocket(port);
             server_udp = new DatagramSocket(port);
             while (true) {
                 if (protocol.equals("tcp")) {
-                    
                     Socket client_socket = server_tcp.accept();
-                    PrintWriter out = new PrintWriter(client_socket.getOutputStream(), true);
 
                     BufferedReader in = new BufferedReader(new InputStreamReader(client_socket.getInputStream()));
                     String command = in.readLine();
@@ -33,10 +31,10 @@ public class server {
                         if (command.startsWith("get")) {
                             String file_name = command.split(" ")[1];
                             if (server_files.indexOf(file_name) != -1) {
-                                out.println("File Deliver from Origin");
+                                tcp_transport.send_command(client_socket, "File Deliver from Origin");
                             } else {
                                 server_files.add(file_name);
-                                out.println("File Not Found in origin");
+                                tcp_transport.send_command(client_socket, "File Not Found in origin");
                             }
                         } else if (command.startsWith("put")) {
 
@@ -45,7 +43,7 @@ public class server {
                         }
                     }
                 } else if (protocol.equals("snw")) {
-                    
+
                     byte[] receiveData = new byte[1024];
                     DatagramPacket server_receive_udp_packet = new DatagramPacket(receiveData, receiveData.length);
                     server_udp.receive(server_receive_udp_packet);
@@ -59,7 +57,6 @@ public class server {
                         int cache_port = server_receive_udp_packet.getPort();
                         System.out.println("Cache data : address: \n\n" + cache_addr + " port : " + cache_port);
                         if (server_files.indexOf(file_name) != -1) {
-                            
                             byte[] sendData = "File Deliver from Origin".getBytes();
                             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, cache_addr,
                                     cache_port);

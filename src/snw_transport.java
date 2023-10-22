@@ -12,6 +12,18 @@ public class snw_transport {
         }
     }
 
+    public static String receive_command(DatagramSocket socket) {
+        try {
+            byte[] data = new byte[1024];
+            DatagramPacket packet = new DatagramPacket(data, data.length);
+            socket.receive(packet);
+            return new String(packet.getData(), 0, packet.getLength());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     public static void sendFile(DatagramSocket socket, InetAddress addr, int port, String path) {
         try {
             File file = new File(path);
