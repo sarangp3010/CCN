@@ -1,19 +1,11 @@
-import java.io.IOException;
+import java.io.*;
 import java.net.*;
 import java.util.*;
 
 public class cache {
-    private static ServerSocket server_tcp = null;
-    private static DatagramSocket server_udp = null;
-    ArrayList<String> cache_files = new ArrayList<>();
-
-    // public cache(int port) throws Exception {
-    //     server_udp = new DatagramSocket(port);
-    // }
-
-    // public cache(String ip, int port) throws Exception {
-    //     server_tcp = new ServerSocket(port);
-    // }
+    private static ServerSocket cache_tcp = null;
+    private static DatagramSocket cache_udp = null;
+    private static ArrayList<String> cache_files = new ArrayList<>();
 
     public static void main(String[] args) {
         if (args.length != 4) {
@@ -26,19 +18,72 @@ public class cache {
         int server_port = Integer.parseInt(args[2]);
         String protocol = args[3].toString();
 
+        System.out.println("port: " + port);
+        System.out.println("protocol" + protocol);
         try {
-            server_tcp = new ServerSocket(port);
-            if (protocol == "tcp") {
-                
-            } else if (protocol == "snw") {
-    
-            } else {
-                System.out.println("From the Cache Server");
-                System.out.println("Invalid protocol");
+            cache_tcp = new ServerSocket(port);
+
+            while (true) {
+                try {
+                    Socket serverClientSocket = cache_tcp.accept();
+                    PrintWriter serverOut = (serverClientSocket != null)
+                            ? new PrintWriter(serverClientSocket.getOutputStream(), true)
+                            : null;
+                    BufferedReader serverIn = (serverClientSocket != null)
+                            ? new BufferedReader(new InputStreamReader(serverClientSocket.getInputStream()))
+                            : null;
+
+                    Socket server_tcp = new Socket(server_ip, server_port);
+                    PrintWriter server_out = new PrintWriter(server_tcp.getOutputStream(), true);
+
+                    BufferedReader server_in = new BufferedReader(
+                            new InputStreamReader(server_tcp.getInputStream()));
+
+                    String command = (serverIn != null) ? serverIn.readLine() : null;
+                    if (protocol.equals("tcp")) {
+                        if (command.startsWith("get")) {
+                            String file_name = command.split(" ")[1];
+                            if (cache_files.indexOf(file_name) != -1) {
+                                serverOut.println("File Delivered from cache");
+                            } else {
+                                System.out.println("inner 1" + command);
+                                try {
+                                    server_out.println(command);
+                                    cache_files.add(file_name);
+                                    String server_response = server_in.readLine();
+                                    serverOut.println(server_response);
+                                } catch (Exception e) {
+                                    System.out.println("err" + e);
+                                }
+                            }
+                        }
+                        serverIn.close();
+                        server_in.close();
+                        // server_out.close();
+                        // serverOut.close();
+                        // serverClientSocket.close();
+                    } else if (protocol.equals("snw")) {
+                        // cache_udp = new DatagramSocket(port);
+                        // DatagramPacket snwPacket = new DatagramPacket(new byte[1024], 1024);
+                        // DatagramSocket snwOutSocket = (snwPacket != null) ? new DatagramSocket() :
+                        // null;
+                        // InetAddress serverAddress = (snwPacket != null) ?
+                        // InetAddress.getByName(server_ip) : null;
+                        // int serverPortNumber = (snwPacket != null) ? server_port : -1;
+                    } else {
+                        System.out.println("From the Cache Server");
+                        System.out.println("Invalid protocol");
+                    }
+                    // serverOut.close();
+                    // serverIn.close();
+                    // cache_tcp.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+
         }
-        
     }
 }

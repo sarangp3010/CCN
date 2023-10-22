@@ -48,32 +48,34 @@ public class client {
             do {
                 System.out.print("Enter command: ");
                 command = buf_reader.readLine();
-                System.out.println("Command: " + command);
                 if (command.startsWith("put")) {
-                    if (protocol == "tcp") {
+                    if (protocol.equals("tcp")) {
 
-                    } else if (protocol == "snw") {
+                    } else if (protocol.equals("snw")) {
 
                     } else {
                         System.out.println("From the Cleint Server");
                         System.out.println("Invalid protocol");
                     }
-                } else if (command.equals("get")) {
+                } else if (command.startsWith("get")) {
                     cache_tcp = new Socket(cache_ip, cache_port);
-                    server_tcp = new Socket(server_ip, server_port);
-                    if (protocol == "tcp") {
-                        tcp_transport.send_command(cache_tcp, command);
-                        String msg = tcp_transport.receive_command(cache_tcp);
+                    // server_tcp = new Socket(server_ip, server_port);
+                    // cache_udp = new DatagramSocket(cache_port);
+                    if (protocol.equals("tcp")) {
+                        PrintWriter out = new PrintWriter(cache_tcp.getOutputStream(), true);
+                        out.println(command);
+                        
+                        BufferedReader in = new BufferedReader(new InputStreamReader(cache_tcp.getInputStream()));
+                        String msg = in.readLine();
                         System.out.println("msg : " + msg);
-                    } else if (protocol == "snw") {
-
+                    } else if (protocol.equals("snw")) {
+                        
                     } else {
                         System.out.println("From the Cleint Server");
                         System.out.println("Invalid protocol");
                     }
                 }
             } while (!command.equals("quit"));
-            close();
         } catch (Exception e) {
             e.printStackTrace();
         }
