@@ -35,8 +35,20 @@ public class client {
                 if (command.startsWith("put")) {
                     if (protocol.equals("tcp")) {
                         server_tcp = new Socket(server_ip, server_port);
+                        tcp_transport.send_command(server_tcp, command);
+
                         String file_path = command.split(" ")[1];
+                        File file = new File(file_path);
+                        if (!file.exists() || !file.isFile()) {
+                            System.out.println("Invalid file ");
+                            continue;    
+                        }
+
                         tcp_transport.sendFile(server_tcp, file_path);
+
+                        String msg = tcp_transport.receive_command(server_tcp);
+
+                        System.out.println("msg: " + msg);
                     } else if (protocol.equals("snw")) {
 
                     } else {

@@ -27,7 +27,7 @@ public class tcp_transport {
             FileInputStream fIn = new FileInputStream(file);
             OutputStream out = socket.getOutputStream();
 
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[(int) file.length()];
             int bytesRead;
 
             while ((bytesRead = fIn.read(buffer)) != -1) {
@@ -35,7 +35,6 @@ public class tcp_transport {
             }
 
             fIn.close();
-            out.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -46,15 +45,14 @@ public class tcp_transport {
             InputStream in = socket.getInputStream();
             FileOutputStream fOut = new FileOutputStream(path);
 
-            byte[] buffer = new byte[1024];
             int bytesRead;
 
+            byte[] buffer = new byte[10000];
             while ((bytesRead = in.read(buffer)) != -1) {
                 fOut.write(buffer, 0, bytesRead);
             }
 
             fOut.close();
-            in.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

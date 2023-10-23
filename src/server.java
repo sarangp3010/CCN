@@ -23,14 +23,14 @@ public class server {
             while (true) {
                 if (protocol.equals("tcp")) {
                     Socket client_socket = server_tcp.accept();
+                    System.out.println("Client connected: " + client_socket.getInetAddress().getHostAddress());
 
                     BufferedReader in = new BufferedReader(new InputStreamReader(client_socket.getInputStream()));
                     String command = in.readLine();
                     System.out.println(" command ::  " + command);
                     if (command != null) {
+                        String file_name = command.split(" ")[1];
                         if (command.startsWith("get")) {
-                            String file_name = command.split(" ")[1];
-                            System.out.println("Called");
                             if (server_files.indexOf(file_name) != -1) {
                                 tcp_transport.send_command(client_socket, "File Deliver from Origin");
                             } else {
@@ -38,7 +38,13 @@ public class server {
                                 tcp_transport.send_command(client_socket, "File Not Found in origin");
                             }
                         } else if (command.startsWith("put")) {
-                            // Nothing to do 
+                            String dir = System.getProperty("user.dir");
+                            System.out.println("Dir: " + dir);
+                            tcp_transport.receiveFile(client_socket, "1" + file_name);
+                            System.out.println("Here1");
+                            server_files.add(file_name);
+                            System.out.println("Here2");
+                            tcp_transport.send_command(client_socket, "File Successfully uploaded");
                         } else {
                             System.out.println("From server: Invalid command");
                         }
