@@ -39,16 +39,17 @@ public class server {
                             }
                         } else if (command.startsWith("put")) {
                             String dir = System.getProperty("user.dir");
-                            System.out.println("Dir: " + dir);
-                            tcp_transport.receiveFile(client_socket, "1" + file_name);
-                            System.out.println("Here1");
+                            
+                            tcp_transport.receiveFile(client_socket, dir + "/server_files/" + file_name, dir + "/client_files/" + file_name);
                             server_files.add(file_name);
-                            System.out.println("Here2");
+
                             tcp_transport.send_command(client_socket, "File Successfully uploaded");
                         } else {
                             System.out.println("From server: Invalid command");
                         }
                     }
+                    client_socket.close();
+                    in.close();
                 } else if (protocol.equals("snw")) {
 
                     byte[] receiveData = new byte[1024];

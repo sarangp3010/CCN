@@ -33,25 +33,32 @@ public class client {
                 System.out.print("Enter command: ");
                 command = buf_reader.readLine();
                 if (command.startsWith("put")) {
+                    String dir = System.getProperty("user.dir");
                     if (protocol.equals("tcp")) {
-                        server_tcp = new Socket(server_ip, server_port);
-                        tcp_transport.send_command(server_tcp, command);
-
                         String file_path = command.split(" ")[1];
-                        File file = new File(file_path);
+                        File file = new File(dir + "/client_files/" + file_path);
                         if (!file.exists() || !file.isFile()) {
-                            System.out.println("Invalid file ");
-                            continue;    
+                            System.out.println("Invalid file:");
+                            continue;
+                        } else {
+                            server_tcp = new Socket(server_ip, server_port);
+                            tcp_transport.send_command(server_tcp, command);
+
+                            tcp_transport.sendFile(server_tcp, dir + "/client_files/" + file_path, dir + "/server_files/" + file_path);
+
+                            String msg = tcp_transport.receive_command(server_tcp);
+
+                            System.out.println("msg: " + msg);
+                            server_tcp.close();
                         }
 
-                        tcp_transport.sendFile(server_tcp, file_path);
-
-                        String msg = tcp_transport.receive_command(server_tcp);
-
-                        System.out.println("msg: " + msg);
                     } else if (protocol.equals("snw")) {
 
                     } else {
+                        if (server_tcp != null) {
+                            server_tcp.close();
+                        }
+                        
                         System.out.println("From the Cleint Server");
                         System.out.println("Invalid protocol");
                     }

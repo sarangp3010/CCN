@@ -19,10 +19,15 @@ public class cache {
         String protocol = args[3].toString();
 
         System.out.println("port: " + port);
-        System.out.println("protocol" + protocol);
+        System.out.println("protocol: " + protocol);
         try {
-            cache_tcp = new ServerSocket(port);
-            cache_udp = new DatagramSocket(port);
+            System.out.println("Calles this");
+            if (protocol.equals("tcp")) {
+                cache_tcp = new ServerSocket(port);
+            } else if (protocol.equals("snw")) {
+                cache_udp = new DatagramSocket(port);
+            }
+
             while (true) {
                 try {
                     if (protocol.equals("tcp")) {
@@ -59,10 +64,12 @@ public class cache {
                         String file_name = command.split(" ")[1];
 
                         if (cache_files.indexOf(file_name) != -1) {
-                            snw_transport.send_command(cache_udp, client_addr, client_port, "File Delivered from cache");
+                            snw_transport.send_command(cache_udp, client_addr, client_port,
+                                    "File Delivered from cache");
                         } else {
                             cache_files.add(file_name);
-                            snw_transport.send_command(cache_udp, InetAddress.getByName(server_ip), server_port, command);
+                            snw_transport.send_command(cache_udp, InetAddress.getByName(server_ip), server_port,
+                                    command);
 
                             String client_receive = snw_transport.receive_command(cache_udp);
 

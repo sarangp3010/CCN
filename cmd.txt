@@ -1,0 +1,3 @@
+scp -r ./tcp_transport.java sp915132@icsi416-fa23.its.albany.edu:/home1/s/s/sp915132/tcp_transport.java
+scp -r ./server.java sp915132@icsi416-fa23.its.albany.edu:/home1/s/s/sp915132/server.java
+scp -r ./client_files/* sp915132@icsi416-fa23.its.albany.edu:/home1/s/s/sp915132/client_files
