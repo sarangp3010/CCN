@@ -6,6 +6,7 @@ public class server {
     private static ServerSocket server_tcp = null;
     private static DatagramSocket server_udp = null;
     private static ArrayList<String> server_files = new ArrayList<>();
+    private static String dir = System.getProperty("user.dir");
 
     public static void main(String[] args) {
         if (args.length != 2) {
@@ -22,33 +23,32 @@ public class server {
             server_udp = new DatagramSocket(port);
             while (true) {
                 if (protocol.equals("tcp")) {
-                    Socket client_socket = server_tcp.accept();
-                    System.out.println("Client connected: " + client_socket.getInetAddress().getHostAddress());
+                    Socket cache_client_socket = server_tcp.accept();
+                    String ip = cache_client_socket.getInetAddress().getHostAddress();
+                    int p = cache_client_socket.getPort();
+                    System.out.println("Client connected: " + cache_client_socket.getInetAddress().getHostAddress());
 
-                    BufferedReader in = new BufferedReader(new InputStreamReader(client_socket.getInputStream()));
+                    BufferedReader in = new BufferedReader(new InputStreamReader(cache_client_socket.getInputStream()));
                     String command = in.readLine();
                     System.out.println(" command ::  " + command);
                     if (command != null) {
                         String file_name = command.split(" ")[1];
                         if (command.startsWith("get")) {
+                            server_files.clear();
+                            tcp_transport.getAllFiles(server_files, "server_files");
                             if (server_files.indexOf(file_name) != -1) {
-                                tcp_transport.send_command(client_socket, "File Deliver from Origin");
+                                tcp_transport.sendFile(cache_client_socket, dir + "/server_files/" + file_name);
                             } else {
-                                server_files.add(file_name);
-                                tcp_transport.send_command(client_socket, "File Not Found in origin");
+                                tcp_transport.send_command(cache_client_socket, "File Not Found in origin", null, -1);
                             }
                         } else if (command.startsWith("put")) {
-                            String dir = System.getProperty("user.dir");
-                            
-                            tcp_transport.receiveFile(client_socket, dir + "/server_files/" + file_name, dir + "/client_files/" + file_name);
-                            server_files.add(file_name);
-
-                            tcp_transport.send_command(client_socket, "File Successfully uploaded");
+                            tcp_transport.send_command(cache_client_socket, "File Successfully uploaded", null, -1);
+                            tcp_transport.receiveFile(cache_client_socket, dir + "/server_files/" + file_name);
                         } else {
                             System.out.println("From server: Invalid command");
                         }
                     }
-                    client_socket.close();
+                    cache_client_socket.close();
                     in.close();
                 } else if (protocol.equals("snw")) {
 

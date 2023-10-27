@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.*;
 
 public class snw_transport {
     public static void send_command(DatagramSocket socket, InetAddress addr, int port, String command) {
@@ -67,5 +68,23 @@ public class snw_transport {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public static long get_file_length(String path) {
+        File f = new File(path);
+        long len = 0;
+        if (f.isFile()) {
+            len = f.length();
+        }
+        return len;
+    }
+
+    public static ArrayList<byte[]> create_chunk(byte[] buffer, int chunk_size) {
+        ArrayList<byte[]> chunks = new ArrayList<>();
+        for (int i = 0; i < buffer.length; i += chunk_size) {
+            byte[] chunk = Arrays.copyOfRange(buffer, i, Math.min(i + chunk_size, buffer.length));
+            chunks.add(chunk);
+        }
+        return chunks;
     }
 }

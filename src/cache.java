@@ -6,6 +6,18 @@ public class cache {
     private static ServerSocket cache_tcp = null;
     private static DatagramSocket cache_udp = null;
     private static ArrayList<String> cache_files = new ArrayList<>();
+    private static String dir = System.getProperty("user.dir");
+
+    public static void check(Socket s) {
+        try {
+            if (s.isOutputShutdown())
+                s.getOutputStream();
+            if (s.isInputShutdown())
+                s.getInputStream();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     public static void main(String[] args) {
         if (args.length != 4) {
@@ -21,7 +33,6 @@ public class cache {
         System.out.println("port: " + port);
         System.out.println("protocol: " + protocol);
         try {
-            System.out.println("Calles this");
             if (protocol.equals("tcp")) {
                 cache_tcp = new ServerSocket(port);
             } else if (protocol.equals("snw")) {
@@ -32,24 +43,29 @@ public class cache {
                 try {
                     if (protocol.equals("tcp")) {
                         Socket server_client_socket = cache_tcp.accept();
-                        BufferedReader server_in = (server_client_socket != null)
-                                ? new BufferedReader(new InputStreamReader(server_client_socket.getInputStream()))
-                                : null;
+                        BufferedReader server_in = new BufferedReader(
+                                new InputStreamReader(server_client_socket.getInputStream()));
 
-                        String command = (server_in != null) ? server_in.readLine() : null;
+                        String command = server_in.readLine();
                         System.out.println("Command: " + command);
                         if (command.startsWith("get")) {
                             String file_name = command.split(" ")[1];
+                            cache_files.clear();
+                            tcp_transport.getAllFiles(cache_files, "cache_files");
                             if (cache_files.indexOf(file_name) != -1) {
-                                tcp_transport.send_command(server_client_socket, "File Delivered from cache");
+                                tcp_transport.send_command(server_client_socket, "File Delivered from cache", null, -1);
+                                tcp_transport.sendFile(server_client_socket, dir + "/cache_files/" + file_name);
                             } else {
                                 Socket server_tcp = new Socket(server_ip, server_port);
-                                tcp_transport.send_command(server_tcp, command);
-                                cache_files.add(file_name);
-                                String msg = tcp_transport.receive_command(server_tcp);
-                                tcp_transport.send_command(server_client_socket, msg);
+                                tcp_transport.send_command(server_tcp, command, server_ip, server_port);
+
+                                tcp_transport.receiveFile(server_tcp, dir + "/cache_files/" + file_name);
+                                
+                                tcp_transport.send_command(server_client_socket, "File Delivered from origin", null, -1);
+                                tcp_transport.sendFile(server_client_socket, dir + "/cache_files/" + file_name);
                             }
                         }
+                        server_client_socket.close();
                     } else if (protocol.equals("snw")) {
                         byte[] cache_received_data = new byte[1024];
                         DatagramPacket cache_receive_udp_packet = new DatagramPacket(cache_received_data,
@@ -72,6 +88,7 @@ public class cache {
                                     command);
 
                             String client_receive = snw_transport.receive_command(cache_udp);
+                            System.out.println("client_receive: " + client_receive);
 
                             snw_transport.send_command(cache_udp, client_addr, client_port, client_receive);
                         }
@@ -83,7 +100,6 @@ public class cache {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-
             }
         } catch (Exception e) {
 

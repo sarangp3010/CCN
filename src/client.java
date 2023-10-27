@@ -4,8 +4,19 @@ import java.io.*;
 public class client {
     private static Socket server_tcp = null;
     private static Socket cache_tcp = null;
-    private static DatagramSocket client_udp = null;
+    private static DatagramSocket client_snw = null;
+    private static String dir = System.getProperty("user.dir");
 
+    public static void check(Socket s) {
+        try {
+            if (s.isOutputShutdown())
+                s.getOutputStream();
+            if (s.isInputShutdown())
+                s.getInputStream();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
     public static void main(String[] args) {
         if (args.length != 5) {
             System.out.println("Invalid args");
@@ -18,44 +29,49 @@ public class client {
         int cache_port = Integer.parseInt(args[3]);
         String protocol = args[4].toString();
 
-        // System.out.println("Hello Client ");
-        // System.out.print(" Server Ip: " + server_ip);
-        // System.out.print(" server_port: " + server_port);
-        // System.out.print(" cache_ip: " + cache_ip);
-        // System.out.print(" cache_port: " + cache_port);
-        // System.out.print(" protocol: " + protocol);
-
         BufferedReader buf_reader = new BufferedReader(new InputStreamReader(System.in));
         String command = "";
         try {
-            client_udp = new DatagramSocket();
+            client_snw = new DatagramSocket();
             do {
                 System.out.print("Enter command: ");
                 command = buf_reader.readLine();
+                String file_path = command.split(" ")[1];
                 if (command.startsWith("put")) {
                     String dir = System.getProperty("user.dir");
                     if (protocol.equals("tcp")) {
-                        String file_path = command.split(" ")[1];
                         File file = new File(dir + "/client_files/" + file_path);
                         if (!file.exists() || !file.isFile()) {
                             System.out.println("Invalid file:");
                             continue;
                         } else {
                             server_tcp = new Socket(server_ip, server_port);
-                            tcp_transport.send_command(server_tcp, command);
-
-                            tcp_transport.sendFile(server_tcp, dir + "/client_files/" + file_path, dir + "/server_files/" + file_path);
+                            tcp_transport.send_command(server_tcp, command, server_ip, server_port);
 
                             String msg = tcp_transport.receive_command(server_tcp);
-
+                            tcp_transport.sendFile(server_tcp, dir + "/client_files/" + file_path);
                             System.out.println("msg: " + msg);
-                            server_tcp.close();
                         }
 
                     } else if (protocol.equals("snw")) {
+                        File file = new File(dir + "/client_files/" + file_path);
+                        if (!file.exists() || !file.isFile()) {
+                            System.out.println("Invalid file:");
+                            continue;
+                        } else {
+                            server_tcp = new Socket(server_ip, server_port);
+                            // tcp_transport.send_command(server_tcp, command);
+
+                            // tcp_transport.sendFile(server_tcp, dir + "/client_files/" + file_path);
+
+                            // String msg = tcp_transport.receive_command(server_tcp);
+
+                            // System.out.println("msg: " + msg);
+                            // server_tcp.close();
+                        }
 
                     } else {
-                        if (server_tcp != null) {
+                        if (server_tcp.isConnected()) {
                             server_tcp.close();
                         }
                         
@@ -65,14 +81,16 @@ public class client {
                 } else if (command.startsWith("get")) {
                     if (protocol.equals("tcp")) {
                         cache_tcp = new Socket(cache_ip, cache_port);
-                        tcp_transport.send_command(cache_tcp, command);
-
+                        tcp_transport.send_command(cache_tcp, command, cache_ip, cache_port);
+                        
                         String msg = tcp_transport.receive_command(cache_tcp);
                         System.out.println("msg : " + msg);
+                        tcp_transport.receiveFile(cache_tcp, dir + "/client_files/" + file_path);
+                        cache_tcp.close();
                     } else if (protocol.equals("snw")) {
-                        snw_transport.send_command(client_udp, InetAddress.getByName(cache_ip), cache_port, command);
+                        snw_transport.send_command(client_snw, InetAddress.getByName(cache_ip), cache_port, command);
 
-                        String msg = snw_transport.receive_command(client_udp);
+                        String msg = snw_transport.receive_command(client_snw);
                         System.out.println("Received from server: " + msg);
                     } else {
                         System.out.println("From the Cleint Server");

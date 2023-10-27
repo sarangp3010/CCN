@@ -1,8 +1,9 @@
 import java.io.*;
 import java.net.*;
+import java.util.*;
 
 public class tcp_transport {
-    public static void send_command(Socket socket, String command) {
+    public static void send_command(Socket socket, String command, String ip, int port) {
         try {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             out.println(command);
@@ -14,14 +15,15 @@ public class tcp_transport {
     public static String receive_command(Socket socket) {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            return in.readLine();
+            String msg = in.readLine();
+            return msg;
         } catch (IOException e) {
             e.printStackTrace();
         }
         return null;
     }
 
-    public static void sendFile(Socket socket, String path, String destination) {
+    public static void sendFile(Socket socket, String path) {
         try {
             File file = new File(path);
             FileInputStream fIn = new FileInputStream(file);
@@ -33,19 +35,18 @@ public class tcp_transport {
             }
             byte[] buffer = new byte[(int) file_size];
             int bytesRead = 0;
-
             while ((bytesRead = fIn.read(buffer)) != -1) {
                 out.write(buffer, 0, bytesRead);
             }
 
             fIn.close();
-            out.flush();
+            socket.shutdownOutput();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public static void receiveFile(Socket socket, String path, String source) {
+    public static void receiveFile(Socket socket, String path) {
         try {
             DataInputStream in = new DataInputStream(socket.getInputStream());
             FileOutputStream fOut = new FileOutputStream(path);
@@ -53,16 +54,34 @@ public class tcp_transport {
             int bytesRead = 0;
 
             byte[] buffer = new byte[1024];
-            File f = new File(source);
-            long file_size = f.length();
-            while (file_size > 0 && (bytesRead = in.read(buffer, 0, (int) Math.min(buffer.length, file_size))) != -1) {
+            // File f = new File(source);
+            // long file_size = f.length();
+            // System.out.println("file_size: " + file_size);
+            // while (file_size > 0 && (bytesRead = in.read(buffer, 0, (int)
+            // Math.min(buffer.length, file_size))) != -1) {
+            // fOut.write(buffer, 0, bytesRead);
+            // file_size -= bytesRead;
+            // }
+
+            do {
                 fOut.write(buffer, 0, bytesRead);
-                file_size -= bytesRead;
-            }
+            } while ((bytesRead = in.read(buffer)) != -1);
 
             fOut.close();
+            socket.shutdownInput();
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void getAllFiles(ArrayList<String> al, String directory) {
+        File dir = new File(System.getProperty("user.dir") + "/" + directory);
+        File[] files = dir.listFiles();
+        for (int i = 0; i < files.length; i++) {
+            if (files[i].isFile()) {
+                String fileName = files[i].getName();
+                al.add(fileName);
+            }
         }
     }
 }
