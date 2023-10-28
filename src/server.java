@@ -72,7 +72,6 @@ public class server {
                     BufferedReader in = new BufferedReader(
                             new InputStreamReader(server_client_socket.getInputStream()));
                     String command = in.readLine();
-                  
 
                     System.out.println("receive at server: " + command);
                     if (command.startsWith("get")) {
@@ -80,24 +79,7 @@ public class server {
                         System.out.println("Filename: " + file_name);
                         String msg = in.readLine();
                         System.out.println("MSG: " + msg);
-                        // InetAddress cache_addr = server_receive_udp_packet.getAddress();
-                        // int cache_port = server_receive_udp_packet.getPort();
-                        // System.out.println("Cache data : address: \n\n" + cache_addr + " port : " +
-                        // cache_port);
-                        // if (server_files.indexOf(file_name) != -1) {
-                        // byte[] sendData = "File Deliver from Origin".getBytes();
-                        // DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
-                        // cache_addr,
-                        // cache_port);
-                        // server_udp.send(sendPacket);
-                        // } else {
-                        // server_files.add(file_name);
-                        // byte[] sendData = "File Not Found in origin".getBytes();
-                        // DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
-                        // cache_addr,
-                        // cache_port);
-                        // server_udp.send(sendPacket);
-                        // }
+
                     } else if (command.startsWith("put")) {
                         String file_name = command.split(" ")[1];
                         String msg = in.readLine();
@@ -131,6 +113,7 @@ public class server {
                             }
                         }
                         tcp_transport.send_command(server_client_socket, "File successfully uploaded.", ip, p);
+                        server_client_socket.close();
                     } else {
                         System.out.println("From server: Invalid command");
                     }

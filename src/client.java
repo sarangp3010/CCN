@@ -1,6 +1,8 @@
 import java.net.*;
 import java.util.*;
 import java.io.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class client {
     private static Socket server_tcp = null;
@@ -19,6 +21,18 @@ public class client {
         }
     }
 
+    private static long get_number(String s) {
+        Pattern pattern = Pattern.compile("\\d+");
+        Matcher matcher = pattern.matcher(s);
+
+        long r = -1;
+        if (matcher.find()) {
+            String numberStr = matcher.group();
+            r = Long.parseLong(numberStr);
+        }
+        return r;
+    }
+
     public static void main(String[] args) {
         if (args.length != 5) {
             System.out.println("Invalid args");
@@ -35,7 +49,6 @@ public class client {
         String command = "";
         try {
             client_snw = new DatagramSocket();
-            // client_snw.setSoTimeout(2000);
             do {
                 System.out.print("Enter command: ");
                 command = buf_reader.readLine();
@@ -78,17 +91,19 @@ public class client {
                                     client_snw.send(sendPacket);
                                     System.out.println("Send: " + i);
 
-                                    String ack = snw_transport.receive_command(client_snw, InetAddress.getByName(server_ip), server_port);
-                                    System.out.println("ACK: " + ack + " receive: "+ i);
+                                    String ack = snw_transport.receive_command(client_snw,
+                                            InetAddress.getByName(server_ip), server_port);
+                                    System.out.println("ACK: " + ack + " receive: " + i);
                                 }
 
                                 System.out.println("Called this");
-                                String fIN = snw_transport.receive_command(client_snw, InetAddress.getByName(server_ip), server_port);
-                                System.out.println("Called3: "+ fIN);
+                                String fIN = snw_transport.receive_command(client_snw, InetAddress.getByName(server_ip),
+                                        server_port);
+                                System.out.println("Called3: " + fIN);
 
                                 if (fIN.equals("FIN")) {
                                     String msg = tcp_transport.receive_command(server_tcp);
-                                    System.out.println("msg: "+ msg);
+                                    System.out.println("msg: " + msg);
                                 } else {
                                     System.out.println("FIN not received");
                                 }
@@ -114,10 +129,48 @@ public class client {
                         tcp_transport.receiveFile(cache_tcp, dir + "/client_files/" + file_path);
                         cache_tcp.close();
                     } else if (protocol.equals("snw")) {
-                        snw_transport.send_command(client_snw, InetAddress.getByName(cache_ip), cache_port, command);
+                        cache_tcp = new Socket(cache_ip, cache_port);
+                        
+                        snw_transport.send_command(client_snw, InetAddress.getByName(cache_ip),
+                        cache_port, command);
+                        tcp_transport.send_command(cache_tcp, command, cache_ip, cache_port);
 
-                        String msg = snw_transport.receive_command(client_snw, InetAddress.getByName(cache_ip), cache_port);
-                        System.out.println("Received from server: " + msg);
+                        String msg = tcp_transport.receive_command(cache_tcp);
+                        System.out.println("msg : " + msg);
+                        long size = get_number(msg);
+                        if (size < 0) {
+                            System.out.println("Invalid file from cache.");
+                            break;
+                        }
+
+                        ArrayList<byte[]> chunks = new ArrayList<>();
+                        client_snw.setSoTimeout(1000);
+                        while (true) {
+                            byte[] r_buf = new byte[1000];
+                            DatagramPacket dp = new DatagramPacket(r_buf, r_buf.length);
+                            client_snw.receive(dp);
+                            byte[] data = dp.getData();
+                            int len = dp.getLength();
+                            size -= len;
+                            System.out.println("len: " + len + " size: " + size);
+
+                            chunks.add(data);
+
+                            InetAddress rcv_addr = dp.getAddress();
+                            int rcv_port = dp.getPort();
+                            snw_transport.send_command(client_snw, rcv_addr, rcv_port, "ACK");
+
+                            if (len < 1000 || size < 1) {
+                                System.out.println("Final Call");
+                                snw_transport.send_command(client_snw, rcv_addr, rcv_port, "FIN");
+                                snw_transport.write_file(chunks, new File(dir + "/client_files/" + file_path));
+                                break;
+                            }
+                        }
+                        System.out.println("Called finals");
+                        String msgg = tcp_transport.receive_command(cache_tcp);
+                        System.out.println("msgg: "+ msgg);
+                        cache_tcp.close();
                     } else {
                         System.out.println("From the Cleint Server");
                         System.out.println("Invalid protocol");

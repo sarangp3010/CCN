@@ -8,17 +8,6 @@ public class cache {
     private static ArrayList<String> cache_files = new ArrayList<>();
     private static String dir = System.getProperty("user.dir");
 
-    public static void check(Socket s) {
-        try {
-            if (s.isOutputShutdown())
-                s.getOutputStream();
-            if (s.isInputShutdown())
-                s.getInputStream();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     public static void main(String[] args) {
         if (args.length != 4) {
             System.out.println("Invalid args");
@@ -36,6 +25,7 @@ public class cache {
             if (protocol.equals("tcp")) {
                 cache_tcp = new ServerSocket(port);
             } else if (protocol.equals("snw")) {
+                cache_tcp = new ServerSocket(port);
                 cache_snw = new DatagramSocket(port);
             }
 
@@ -60,37 +50,77 @@ public class cache {
                                 tcp_transport.send_command(server_tcp, command, server_ip, server_port);
 
                                 tcp_transport.receiveFile(server_tcp, dir + "/cache_files/" + file_name);
-                                
-                                tcp_transport.send_command(server_client_socket, "File Delivered from origin", null, -1);
+
+                                tcp_transport.send_command(server_client_socket, "File Delivered from origin", null,
+                                        -1);
                                 tcp_transport.sendFile(server_client_socket, dir + "/cache_files/" + file_name);
                             }
                         }
                         server_client_socket.close();
                     } else if (protocol.equals("snw")) {
-                        byte[] cache_received_data = new byte[1024];
-                        DatagramPacket cache_receive_udp_packet = new DatagramPacket(cache_received_data,
-                                cache_received_data.length);
-                                cache_snw.receive(cache_receive_udp_packet);
+                        Socket cache_client_socket = cache_tcp.accept();
+                        byte[] readCommand = new byte[1024];
+                        DatagramPacket cache_receive_udp_packet = new DatagramPacket(readCommand,
+                                readCommand.length);
+                        cache_snw.receive(cache_receive_udp_packet);
 
                         String command = new String(cache_receive_udp_packet.getData(), 0,
                                 cache_receive_udp_packet.getLength());
+                        System.out.println("command: " + command);
 
                         InetAddress client_addr = cache_receive_udp_packet.getAddress();
                         int client_port = cache_receive_udp_packet.getPort();
+
                         String file_name = command.split(" ")[1];
 
-                        if (cache_files.indexOf(file_name) != -1) {
-                            snw_transport.send_command(cache_snw, client_addr, client_port,
-                                    "File Delivered from cache");
-                        } else {
-                            cache_files.add(file_name);
-                            snw_transport.send_command(cache_snw, InetAddress.getByName(server_ip), server_port,
-                                    command);
+                        if (command != null) {
+                            if (command.startsWith("get")) {
+                                cache_files.clear();
+                                tcp_transport.getAllFiles(cache_files, "cache_files");
+                                if (cache_files.indexOf(file_name) != -1) {
+                                    File file = new File(dir + "/cache_files/" + file_name);
+                                    if (!file.exists() || !file.isFile()) {
+                                        System.out.println("Invalid file:");
+                                        continue;
+                                    }
+                                    long file_size = file.length();
+                                    tcp_transport.send_command(cache_client_socket, "LEN:" + file_size, null, -1);
 
-                            String client_receive = snw_transport.receive_command(cache_snw);
-                            System.out.println("client_receive: " + client_receive);
+                                    ArrayList<byte[]> chunks = snw_transport.create_chunk(file, 1000);
+                                    try {
+                                        cache_snw.setSoTimeout(1000);
+                                        for (int i = 0; i < chunks.size(); i++) {
+                                            byte[] sendData = chunks.get(i);
+                                            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                                                    client_addr, client_port);
+                                            cache_snw.send(sendPacket);
+                                            System.out.println("Send: " + i);
 
-                            snw_transport.send_command(cache_snw, client_addr, client_port, client_receive);
+                                            String ack = snw_transport.receive_command(cache_snw,
+                                                    client_addr, client_port);
+                                            
+                                        }
+
+                                        String fIN = snw_transport.receive_command(cache_snw, client_addr, client_port);
+                                        
+                                        tcp_transport.send_command(cache_client_socket, "File Delivered from cache.",
+                                                null, -1);
+                                    } catch (Exception e) {
+
+                                    }
+
+                                } else {
+                                    // snw_transport.send_command(cache_snw, InetAddress.getByName(server_ip),
+                                    // server_port,
+                                    // command);
+
+                                    // String client_receive = snw_transport.receive_command(cache_snw);
+                                    // System.out.println("client_receive: " + client_receive);
+
+                                    // snw_transport.send_command(cache_snw, client_addr, client_port,
+                                    // client_receive);
+                                }
+                            }
                         }
 
                     } else {
