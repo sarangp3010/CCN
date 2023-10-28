@@ -76,12 +76,22 @@ public class client {
                                     DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
                                             InetAddress.getByName(server_ip), server_port);
                                     client_snw.send(sendPacket);
+                                    System.out.println("Send: " + i);
 
-                                    String ack = snw_transport.receive_command(client_snw);
-                                    System.out.println("ACK: " + ack);
+                                    String ack = snw_transport.receive_command(client_snw, InetAddress.getByName(server_ip), server_port);
+                                    System.out.println("ACK: " + ack + " receive: "+ i);
                                 }
 
-                                System.out.println("Called3: ");
+                                System.out.println("Called this");
+                                String fIN = snw_transport.receive_command(client_snw, InetAddress.getByName(server_ip), server_port);
+                                System.out.println("Called3: "+ fIN);
+
+                                if (fIN.equals("FIN")) {
+                                    String msg = tcp_transport.receive_command(server_tcp);
+                                    System.out.println("msg: "+ msg);
+                                } else {
+                                    System.out.println("FIN not received");
+                                }
                             } catch (SocketTimeoutException e) {
                                 System.out.println("Did not receive ACK. Terminating.");
                             }
@@ -106,7 +116,7 @@ public class client {
                     } else if (protocol.equals("snw")) {
                         snw_transport.send_command(client_snw, InetAddress.getByName(cache_ip), cache_port, command);
 
-                        String msg = snw_transport.receive_command(client_snw);
+                        String msg = snw_transport.receive_command(client_snw, InetAddress.getByName(cache_ip), cache_port);
                         System.out.println("Received from server: " + msg);
                     } else {
                         System.out.println("From the Cleint Server");

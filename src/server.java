@@ -10,7 +10,7 @@ public class server {
     private static ArrayList<String> server_files = new ArrayList<>();
     private static String dir = System.getProperty("user.dir");
 
-    private long get_number(String s) {
+    private static long get_number(String s) {
         Pattern pattern = Pattern.compile("\\d+");
         Matcher matcher = pattern.matcher(s);
 
@@ -68,17 +68,12 @@ public class server {
                     Socket server_client_socket = server_tcp.accept();
                     String ip = server_client_socket.getInetAddress().getHostAddress();
                     int p = server_client_socket.getPort();
-                    System.out.println("Client connected: " + "ip: " + ip + " port: " + p);
 
                     BufferedReader in = new BufferedReader(
                             new InputStreamReader(server_client_socket.getInputStream()));
                     String command = in.readLine();
-                    // byte[] receiveData = new byte[1024];
-                    // DatagramPacket server_receive_udp_packet = new DatagramPacket(receiveData,
-                    // receiveData.length);
-                    // server_udp.receive(server_receive_udp_packet);
-                    // String command = new String(server_receive_udp_packet.getData(), 0,
-                    // server_receive_udp_packet.getLength());
+                  
+
                     System.out.println("receive at server: " + command);
                     if (command.startsWith("get")) {
                         String file_name = command.split(" ")[1];
@@ -105,48 +100,37 @@ public class server {
                         // }
                     } else if (command.startsWith("put")) {
                         String file_name = command.split(" ")[1];
-                        System.out.println("Filename: " + file_name);
                         String msg = in.readLine();
-                        long size = 0;
-                        System.out.println("MSG: " + msg);
-                        Pattern pattern = Pattern.compile("\\d+");
-                        Matcher matcher = pattern.matcher(msg);
-
-                        if (matcher.find()) {
-                            String numberStr = matcher.group();
-                            size = Long.parseLong(numberStr);
+                        long size = get_number(msg);
+                        if (size < 0) {
+                            tcp_transport.send_command(server_client_socket, "Invalid File Size.", ip, p);
+                            break;
                         }
 
-                        byte[] buf = new byte[1000];
                         ArrayList<byte[]> chunks = new ArrayList<>();
-                        System.out.println("ip: " + ip);
-                        System.out.println("p: " + p);
-                        System.out.println("size: " + size);
-                        FileOutputStream fOut = new FileOutputStream(file_name);
-                        // server_udp.setSoTimeout(100);
-                        while (size > 0) {
-                            DatagramPacket dp = new DatagramPacket(buf, buf.length);
+                        server_udp.setSoTimeout(1000);
+                        while (true) {
+                            byte[] r_buf = new byte[1000];
+                            DatagramPacket dp = new DatagramPacket(r_buf, r_buf.length);
                             server_udp.receive(dp);
                             byte[] data = dp.getData();
                             int len = dp.getLength();
                             size -= len;
-                            System.out.println("len: " + len + "  size: " + size);
-                            fOut.write(data, 0, len);
 
-                            // Send ACK to the client
-                            InetAddress clientAddress = dp.getAddress();
-                            int clientPort = dp.getPort();
-                            String ack = "ACK";
-                            byte[] ackData = ack.getBytes();
-                            DatagramPacket ackPacket = new DatagramPacket(ackData, ackData.length, clientAddress,
-                                    clientPort);
-                            server_udp.send(ackPacket);
+                            chunks.add(data);
 
-                            // Last packet received
+                            InetAddress rcv_addr = dp.getAddress();
+                            int rcv_port = dp.getPort();
+                            snw_transport.send_command(server_udp, rcv_addr, rcv_port, "ACK");
+
                             if (len < 1000 || size < 1) {
+                                System.out.println("Final Call");
+                                snw_transport.send_command(server_udp, rcv_addr, rcv_port, "FIN");
+                                snw_transport.write_file(chunks, new File(dir + "/server_files/" + file_name));
                                 break;
                             }
                         }
+                        tcp_transport.send_command(server_client_socket, "File successfully uploaded.", ip, p);
                     } else {
                         System.out.println("From server: Invalid command");
                     }
