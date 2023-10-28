@@ -1,4 +1,5 @@
 import java.net.*;
+import java.util.*;
 import java.io.*;
 
 public class client {
@@ -17,6 +18,7 @@ public class client {
             e.printStackTrace();
         }
     }
+
     public static void main(String[] args) {
         if (args.length != 5) {
             System.out.println("Invalid args");
@@ -33,6 +35,7 @@ public class client {
         String command = "";
         try {
             client_snw = new DatagramSocket();
+            // client_snw.setSoTimeout(2000);
             do {
                 System.out.print("Enter command: ");
                 command = buf_reader.readLine();
@@ -55,26 +58,39 @@ public class client {
 
                     } else if (protocol.equals("snw")) {
                         File file = new File(dir + "/client_files/" + file_path);
+
                         if (!file.exists() || !file.isFile()) {
                             System.out.println("Invalid file:");
                             continue;
                         } else {
-                            server_tcp = new Socket(server_ip, server_port);
-                            // tcp_transport.send_command(server_tcp, command);
+                            try {
+                                long file_size = file.length();
+                                server_tcp = new Socket(server_ip, server_port);
+                                tcp_transport.send_command(server_tcp, command, server_ip, server_port);
+                                tcp_transport.send_command(server_tcp, "LEN:" + file_size, server_ip, server_port);
 
-                            // tcp_transport.sendFile(server_tcp, dir + "/client_files/" + file_path);
+                                ArrayList<byte[]> chunks = snw_transport.create_chunk(file, 1000);
+                                client_snw.setSoTimeout(1000);
+                                for (int i = 0; i < chunks.size(); i++) {
+                                    byte[] sendData = chunks.get(i);
+                                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                                            InetAddress.getByName(server_ip), server_port);
+                                    client_snw.send(sendPacket);
 
-                            // String msg = tcp_transport.receive_command(server_tcp);
+                                    String ack = snw_transport.receive_command(client_snw);
+                                    System.out.println("ACK: " + ack);
+                                }
 
-                            // System.out.println("msg: " + msg);
-                            // server_tcp.close();
+                                System.out.println("Called3: ");
+                            } catch (SocketTimeoutException e) {
+                                System.out.println("Did not receive ACK. Terminating.");
+                            }
                         }
-
                     } else {
                         if (server_tcp.isConnected()) {
                             server_tcp.close();
                         }
-                        
+
                         System.out.println("From the Cleint Server");
                         System.out.println("Invalid protocol");
                     }
@@ -82,7 +98,7 @@ public class client {
                     if (protocol.equals("tcp")) {
                         cache_tcp = new Socket(cache_ip, cache_port);
                         tcp_transport.send_command(cache_tcp, command, cache_ip, cache_port);
-                        
+
                         String msg = tcp_transport.receive_command(cache_tcp);
                         System.out.println("msg : " + msg);
                         tcp_transport.receiveFile(cache_tcp, dir + "/client_files/" + file_path);
@@ -101,7 +117,9 @@ public class client {
                     continue;
                 }
             } while (!command.equals("quit"));
-        } catch (Exception e) {
+        } catch (
+
+        Exception e) {
             e.printStackTrace();
         }
     }

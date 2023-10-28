@@ -42,7 +42,7 @@ public class snw_transport {
             socket.send(send);
 
             fIn.close();
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -65,7 +65,7 @@ public class snw_transport {
             }
 
             fIn.close();
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -79,11 +79,19 @@ public class snw_transport {
         return len;
     }
 
-    public static ArrayList<byte[]> create_chunk(byte[] buffer, int chunk_size) {
+    public static ArrayList<byte[]> create_chunk(File file, int chunk_size) {
         ArrayList<byte[]> chunks = new ArrayList<>();
-        for (int i = 0; i < buffer.length; i += chunk_size) {
-            byte[] chunk = Arrays.copyOfRange(buffer, i, Math.min(i + chunk_size, buffer.length));
-            chunks.add(chunk);
+        FileInputStream fIn;
+        try {
+            fIn = new FileInputStream(file);
+            byte[] buffer = new byte[chunk_size];
+
+            while (fIn.read(buffer) != -1) {
+                chunks.add(buffer);
+            }
+            fIn.close();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return chunks;
     }

@@ -4,7 +4,7 @@ import java.util.*;
 
 public class cache {
     private static ServerSocket cache_tcp = null;
-    private static DatagramSocket cache_udp = null;
+    private static DatagramSocket cache_snw = null;
     private static ArrayList<String> cache_files = new ArrayList<>();
     private static String dir = System.getProperty("user.dir");
 
@@ -36,7 +36,7 @@ public class cache {
             if (protocol.equals("tcp")) {
                 cache_tcp = new ServerSocket(port);
             } else if (protocol.equals("snw")) {
-                cache_udp = new DatagramSocket(port);
+                cache_snw = new DatagramSocket(port);
             }
 
             while (true) {
@@ -70,7 +70,7 @@ public class cache {
                         byte[] cache_received_data = new byte[1024];
                         DatagramPacket cache_receive_udp_packet = new DatagramPacket(cache_received_data,
                                 cache_received_data.length);
-                        cache_udp.receive(cache_receive_udp_packet);
+                                cache_snw.receive(cache_receive_udp_packet);
 
                         String command = new String(cache_receive_udp_packet.getData(), 0,
                                 cache_receive_udp_packet.getLength());
@@ -80,17 +80,17 @@ public class cache {
                         String file_name = command.split(" ")[1];
 
                         if (cache_files.indexOf(file_name) != -1) {
-                            snw_transport.send_command(cache_udp, client_addr, client_port,
+                            snw_transport.send_command(cache_snw, client_addr, client_port,
                                     "File Delivered from cache");
                         } else {
                             cache_files.add(file_name);
-                            snw_transport.send_command(cache_udp, InetAddress.getByName(server_ip), server_port,
+                            snw_transport.send_command(cache_snw, InetAddress.getByName(server_ip), server_port,
                                     command);
 
-                            String client_receive = snw_transport.receive_command(cache_udp);
+                            String client_receive = snw_transport.receive_command(cache_snw);
                             System.out.println("client_receive: " + client_receive);
 
-                            snw_transport.send_command(cache_udp, client_addr, client_port, client_receive);
+                            snw_transport.send_command(cache_snw, client_addr, client_port, client_receive);
                         }
 
                     } else {
