@@ -30,21 +30,16 @@ public class server {
 
         int port = Integer.parseInt(args[0]);
         String protocol = args[1].toString();
-        System.out.println("Hello Server" + port + protocol);
-
+        
         try {
             server_tcp = new ServerSocket(port);
             server_udp = new DatagramSocket(port);
             while (true) {
                 if (protocol.equals("tcp")) {
                     Socket cache_client_socket = server_tcp.accept();
-                    String ip = cache_client_socket.getInetAddress().getHostAddress();
-                    int p = cache_client_socket.getPort();
-                    System.out.println("Client connected: " + " ip: " + ip + " post: " + p);
 
                     BufferedReader in = new BufferedReader(new InputStreamReader(cache_client_socket.getInputStream()));
                     String command = in.readLine();
-                    System.out.println(" command ::  " + command);
                     if (command != null) {
                         String file_name = command.split(" ")[1];
                         if (command.startsWith("get")) {
@@ -66,53 +61,91 @@ public class server {
                     in.close();
                 } else if (protocol.equals("snw")) {
                     Socket server_client_socket = server_tcp.accept();
-                    String ip = server_client_socket.getInetAddress().getHostAddress();
-                    int p = server_client_socket.getPort();
 
                     BufferedReader in = new BufferedReader(
                             new InputStreamReader(server_client_socket.getInputStream()));
                     String command = in.readLine();
 
-                    System.out.println("receive at server: " + command);
+                    InetAddress cache_addr = server_client_socket.getInetAddress();
+                    int cache_port = server_client_socket.getPort();
                     if (command.startsWith("get")) {
                         String file_name = command.split(" ")[1];
-                        System.out.println("Filename: " + file_name);
-                        String msg = in.readLine();
-                        System.out.println("MSG: " + msg);
+                        server_files.clear();
+                        tcp_transport.getAllFiles(server_files, "server_files");
 
+                        if (server_files.indexOf(file_name) != -1) {
+                            File file = new File(dir + "/server_files/" + file_name);
+                            if (!file.exists() || !file.isFile()) {
+                                System.out.println("Invalid file:");
+                                continue;
+                            }
+                            long file_size = file.length();
+                            tcp_transport.send_command(server_client_socket, "LEN:" + file_size, null, -1);
+
+                            ArrayList<byte[]> chunks = snw_transport.create_chunk(file, 1000);
+                            try {
+                                server_udp.setSoTimeout(1000);
+                                for (int i = 0; i < chunks.size(); i++) {
+                                    byte[] sendData = chunks.get(i);
+                                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                                            cache_addr, cache_port);
+                                    server_udp.send(sendPacket);
+                                    System.out.println("Send: " + i);
+
+                                    String ack = snw_transport.receive_command(server_udp,
+                                            cache_addr, cache_port);
+
+                                }
+
+                                String fIN = snw_transport.receive_command(server_udp, cache_addr, cache_port);
+
+                                // tcp_transport.send_command(server_client_socket, "File Delivered from
+                                // server.",
+                                // null, -1);
+                            } catch (Exception e) {
+
+                            }
+
+                        } else {
+                            // tcp_transport.send_command(cache_client_socket, "File Not Found in origin",
+                            // null, -1);
+                        }
+                        System.out.println("Filename: " + file_name);
                     } else if (command.startsWith("put")) {
                         String file_name = command.split(" ")[1];
                         String msg = in.readLine();
                         long size = get_number(msg);
                         if (size < 0) {
-                            tcp_transport.send_command(server_client_socket, "Invalid File Size.", ip, p);
+                            tcp_transport.send_command(server_client_socket, "Invalid File Size.", null, -1);
                             break;
                         }
 
                         ArrayList<byte[]> chunks = new ArrayList<>();
                         server_udp.setSoTimeout(1000);
+                        FileOutputStream fOut = new FileOutputStream(new File(dir + "/server_files/" + file_name));
                         while (true) {
-                            byte[] r_buf = new byte[1000];
+                            byte[] r_buf = new byte[1024];
                             DatagramPacket dp = new DatagramPacket(r_buf, r_buf.length);
                             server_udp.receive(dp);
-                            byte[] data = dp.getData();
                             int len = dp.getLength();
+                            fOut.write(dp.getData(), 0, len);
+                            fOut.flush();
                             size -= len;
 
-                            chunks.add(data);
+                            chunks.add(dp.getData());
 
                             InetAddress rcv_addr = dp.getAddress();
                             int rcv_port = dp.getPort();
                             snw_transport.send_command(server_udp, rcv_addr, rcv_port, "ACK");
 
                             if (len < 1000 || size < 1) {
-                                System.out.println("Final Call");
                                 snw_transport.send_command(server_udp, rcv_addr, rcv_port, "FIN");
-                                snw_transport.write_file(chunks, new File(dir + "/server_files/" + file_name));
+                                // snw_transport.write_file(chunks, new File(dir + "/server_files/" + file_name));
                                 break;
                             }
                         }
-                        tcp_transport.send_command(server_client_socket, "File successfully uploaded.", ip, p);
+                        tcp_transport.send_command(server_client_socket, "File successfully uploaded.", null, -1);
+                        fOut.close();
                         server_client_socket.close();
                     } else {
                         System.out.println("From server: Invalid command");

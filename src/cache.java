@@ -1,12 +1,26 @@
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class cache {
     private static ServerSocket cache_tcp = null;
     private static DatagramSocket cache_snw = null;
     private static ArrayList<String> cache_files = new ArrayList<>();
     private static String dir = System.getProperty("user.dir");
+
+    private static long get_number(String s) {
+        Pattern pattern = Pattern.compile("\\d+");
+        Matcher matcher = pattern.matcher(s);
+
+        long r = -1;
+        if (matcher.find()) {
+            String numberStr = matcher.group();
+            r = Long.parseLong(numberStr);
+        }
+        return r;
+    }
 
     public static void main(String[] args) {
         if (args.length != 4) {
@@ -19,8 +33,6 @@ public class cache {
         int server_port = Integer.parseInt(args[2]);
         String protocol = args[3].toString();
 
-        System.out.println("port: " + port);
-        System.out.println("protocol: " + protocol);
         try {
             if (protocol.equals("tcp")) {
                 cache_tcp = new ServerSocket(port);
@@ -37,7 +49,6 @@ public class cache {
                                 new InputStreamReader(server_client_socket.getInputStream()));
 
                         String command = server_in.readLine();
-                        System.out.println("Command: " + command);
                         if (command.startsWith("get")) {
                             String file_name = command.split(" ")[1];
                             cache_files.clear();
@@ -59,23 +70,18 @@ public class cache {
                         server_client_socket.close();
                     } else if (protocol.equals("snw")) {
                         Socket cache_client_socket = cache_tcp.accept();
-                        byte[] readCommand = new byte[1024];
-                        DatagramPacket cache_receive_udp_packet = new DatagramPacket(readCommand,
-                                readCommand.length);
-                        cache_snw.receive(cache_receive_udp_packet);
+                        BufferedReader client_in = new BufferedReader(
+                                new InputStreamReader(cache_client_socket.getInputStream()));
 
-                        String command = new String(cache_receive_udp_packet.getData(), 0,
-                                cache_receive_udp_packet.getLength());
-                        System.out.println("command: " + command);
+                        String command = client_in.readLine();
 
-                        InetAddress client_addr = cache_receive_udp_packet.getAddress();
-                        int client_port = cache_receive_udp_packet.getPort();
-
+                        InetAddress client_addr = cache_client_socket.getInetAddress();
+                        int client_port = cache_client_socket.getPort();
                         String file_name = command.split(" ")[1];
 
+                        cache_files.clear();
                         if (command != null) {
                             if (command.startsWith("get")) {
-                                cache_files.clear();
                                 tcp_transport.getAllFiles(cache_files, "cache_files");
                                 if (cache_files.indexOf(file_name) != -1) {
                                     File file = new File(dir + "/cache_files/" + file_name);
@@ -94,41 +100,127 @@ public class cache {
                                             DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
                                                     client_addr, client_port);
                                             cache_snw.send(sendPacket);
-                                            System.out.println("Send: " + i);
 
                                             String ack = snw_transport.receive_command(cache_snw,
                                                     client_addr, client_port);
-                                            
+                                            if (!ack.equals("ACK")) {
+                                                System.out.println("Did not receive ACK. Terminating.");
+                                                tcp_transport.send_command(cache_client_socket,
+                                                        "Did not receive ACK. Terminating.",
+                                                        null, -1);
+                                                break;
+                                            }
                                         }
 
                                         String fIN = snw_transport.receive_command(cache_snw, client_addr, client_port);
-                                        
+                                        if (!fIN.equals("FIN")) {
+                                            tcp_transport.send_command(cache_client_socket,
+                                                    "Did not receive ACK. Terminating.", null, -1);
+                                            break;
+                                        }
+
                                         tcp_transport.send_command(cache_client_socket, "File Delivered from cache.",
                                                 null, -1);
+                                    } catch (SocketTimeoutException e) {
+                                        System.out.println("Data transmission terminated prematurely.");
+                                        tcp_transport.send_command(cache_client_socket,
+                                                "Data transmission terminated prematurely.",
+                                                null, -1);
                                     } catch (Exception e) {
+                                        System.out.println("Something went wrong.");
+                                        tcp_transport.send_command(cache_client_socket,
+                                                "Data transmission terminated prematurely.",
+                                                null, -1);
+                                    }
+                                } else {
+                                    Socket server_tcp = new Socket(server_ip, server_port);
+                                    DatagramSocket cache_server_snw = new DatagramSocket(server_tcp.getLocalPort());
+                                    tcp_transport.send_command(server_tcp, command, server_ip, server_port);
 
+                                    String msg = tcp_transport.receive_command(server_tcp);
+                                    long size = get_number(msg);
+                                    if (size < 0) {
+                                        System.out.println("Invalid file from cache.");
+                                        break;
                                     }
 
-                                } else {
-                                    // snw_transport.send_command(cache_snw, InetAddress.getByName(server_ip),
-                                    // server_port,
-                                    // command);
+                                    ArrayList<byte[]> chunks = new ArrayList<>();
+                                    cache_server_snw.setSoTimeout(1000);
+                                    FileOutputStream fOut = new FileOutputStream(
+                                            new File(dir + "/cache_files/" + file_name));
+                                    while (true) {
+                                        byte[] r_buf = new byte[1000];
+                                        DatagramPacket dp = new DatagramPacket(r_buf, r_buf.length);
+                                        cache_server_snw.receive(dp);
+                                        int len = dp.getLength();
+                                        fOut.write(dp.getData(), 0, len);
+                                        size -= len;
 
-                                    // String client_receive = snw_transport.receive_command(cache_snw);
-                                    // System.out.println("client_receive: " + client_receive);
+                                        chunks.add(dp.getData());
+                                        InetAddress rcv_addr = dp.getAddress();
+                                        int rcv_port = dp.getPort();
+                                        snw_transport.send_command(cache_server_snw, rcv_addr, rcv_port, "ACK");
 
-                                    // snw_transport.send_command(cache_snw, client_addr, client_port,
-                                    // client_receive);
+                                        if (len < 1000 || size < 1) {
+                                            snw_transport.send_command(cache_server_snw, rcv_addr, rcv_port, "FIN");
+                                            // snw_transport.write_file(chunks,
+                                            // new File(dir + "/cache_files/" + file_name));
+                                            break;
+                                        }
+                                    }
+
+                                    File file = new File(dir + "/cache_files/" + file_name);
+                                    if (!file.exists() || !file.isFile()) {
+                                        System.out.println("Invalid file:");
+                                        throw new Exception("Cache dosen't have a file.");
+                                    }
+                                    long file_size = file.length();
+                                    tcp_transport.send_command(cache_client_socket, "LEN:" + file_size, null, -1);
+
+                                    ArrayList<byte[]> cache_chunks = snw_transport.create_chunk(file, 1000);
+                                    try {
+                                        cache_snw.setSoTimeout(1000);
+                                        for (int i = 0; i < cache_chunks.size(); i++) {
+                                            byte[] sendData = cache_chunks.get(i);
+                                            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                                                    client_addr, client_port);
+                                            cache_snw.send(sendPacket);
+
+                                            String ack = snw_transport.receive_command(cache_snw,
+                                                    client_addr, client_port);
+                                            if (!ack.equals("ACK")) {
+                                                System.out.println("Did not receive ACK. Terminating.");
+                                                tcp_transport.send_command(cache_client_socket,
+                                                        "File Delivered from origin.",
+                                                        null, -1);
+                                                break;
+                                            }
+                                        }
+                                        String fIN = snw_transport.receive_command(cache_snw, client_addr, client_port);
+                                        if (fIN.equals("FIN")) {
+                                            System.out.println("");
+                                            break;
+                                        }
+                                        tcp_transport.send_command(cache_client_socket, "File Delivered from origin.",
+                                                null, -1);
+                                    } catch (SocketTimeoutException e) {
+                                        System.out.println("Data transmission terminated prematurely.");
+                                        tcp_transport.send_command(cache_client_socket,
+                                                "Data transmission terminated prematurely.",
+                                                null, -1);
+                                    } catch (Exception e) {
+                                        tcp_transport.send_command(cache_client_socket,
+                                                "Data transmission terminated prematurely.",
+                                                null, -1);
+                                    }
                                 }
                             }
                         }
 
                     } else {
-                        System.out.println("From the Cache Server");
-                        System.out.println("Invalid protocol");
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+
                 }
             }
         } catch (Exception e) {

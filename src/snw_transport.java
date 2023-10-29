@@ -16,7 +16,13 @@ public class snw_transport {
     public static String receive_command(DatagramSocket socket, InetAddress addr, int port) {
         try {
             byte[] data = new byte[1024];
-            DatagramPacket packet = new DatagramPacket(data, data.length, addr, port);
+            DatagramPacket packet;
+            if (addr == null && port == -1) {
+                packet = new DatagramPacket(data, data.length);
+            } else {
+                packet = new DatagramPacket(data, data.length, addr, port);
+            }
+
             socket.receive(packet);
             return new String(packet.getData(), 0, packet.getLength());
         } catch (IOException e) {
@@ -98,11 +104,12 @@ public class snw_transport {
 
     public static void write_file(ArrayList<byte[]> chunks, File file) {
         try {
-            FileOutputStream fOut = new FileOutputStream(file);   
+            FileOutputStream fOut = new FileOutputStream(file);
 
-            for (int i=0;i<chunks.size();i++) {
+            for (int i = 0; i < chunks.size(); i++) {
                 byte[] buf = chunks.get(i);
                 fOut.write(buf, 0, buf.length);
+                fOut.flush();
             }
             fOut.close();
         } catch (Exception e) {

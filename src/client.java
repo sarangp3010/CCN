@@ -10,17 +10,6 @@ public class client {
     private static DatagramSocket client_snw = null;
     private static String dir = System.getProperty("user.dir");
 
-    public static void check(Socket s) {
-        try {
-            if (s.isOutputShutdown())
-                s.getOutputStream();
-            if (s.isInputShutdown())
-                s.getInputStream();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     private static long get_number(String s) {
         Pattern pattern = Pattern.compile("\\d+");
         Matcher matcher = pattern.matcher(s);
@@ -48,13 +37,12 @@ public class client {
         BufferedReader buf_reader = new BufferedReader(new InputStreamReader(System.in));
         String command = "";
         try {
-            client_snw = new DatagramSocket();
             do {
                 System.out.print("Enter command: ");
                 command = buf_reader.readLine();
                 String file_path = command.split(" ")[1];
                 if (command.startsWith("put")) {
-                    String dir = System.getProperty("user.dir");
+                    System.out.println("Awaiting server response.");
                     if (protocol.equals("tcp")) {
                         File file = new File(dir + "/client_files/" + file_path);
                         if (!file.exists() || !file.isFile()) {
@@ -66,9 +54,9 @@ public class client {
 
                             String msg = tcp_transport.receive_command(server_tcp);
                             tcp_transport.sendFile(server_tcp, dir + "/client_files/" + file_path);
-                            System.out.println("msg: " + msg);
+                            System.out.println("Server response: " + msg);
+                            server_tcp.close();
                         }
-
                     } else if (protocol.equals("snw")) {
                         File file = new File(dir + "/client_files/" + file_path);
 
@@ -79,43 +67,57 @@ public class client {
                             try {
                                 long file_size = file.length();
                                 server_tcp = new Socket(server_ip, server_port);
+                                client_snw = new DatagramSocket(server_tcp.getLocalPort());
+                                client_snw.setSoTimeout(1000);
                                 tcp_transport.send_command(server_tcp, command, server_ip, server_port);
                                 tcp_transport.send_command(server_tcp, "LEN:" + file_size, server_ip, server_port);
 
                                 ArrayList<byte[]> chunks = snw_transport.create_chunk(file, 1000);
-                                client_snw.setSoTimeout(1000);
-                                for (int i = 0; i < chunks.size(); i++) {
-                                    byte[] sendData = chunks.get(i);
-                                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                                int bytesRead = 0;
+                                byte[] buf = new byte[1000];
+                                FileInputStream fIn = new FileInputStream(file);
+                                while ((bytesRead = fIn.read(buf)) != -1) {
+                                    DatagramPacket sendPacket = new DatagramPacket(buf, bytesRead,
                                             InetAddress.getByName(server_ip), server_port);
                                     client_snw.send(sendPacket);
-                                    System.out.println("Send: " + i);
 
                                     String ack = snw_transport.receive_command(client_snw,
                                             InetAddress.getByName(server_ip), server_port);
-                                    System.out.println("ACK: " + ack + " receive: " + i);
+                                    if (!ack.equals("ACK")) {
+                                        System.out.println("Did not receive ACK. Terminating.");
+                                        break;
+                                    }
                                 }
+                                fIn.close();
 
-                                System.out.println("Called this");
+                                // for (int i = 0; i < chunks.size(); i++) {
+                                // byte[] sendData = chunks.get(i);
+                                // DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                                // InetAddress.getByName(server_ip), server_port);
+                                // client_snw.send(sendPacket);
+
+                                // String ack = snw_transport.receive_command(client_snw,
+                                // InetAddress.getByName(server_ip), server_port);
+                                // if (!ack.equals("ACK")) {
+                                // System.out.println("Did not receive ACK. Terminating.");
+                                // break;
+                                // }
+                                // }
+
                                 String fIN = snw_transport.receive_command(client_snw, InetAddress.getByName(server_ip),
                                         server_port);
-                                System.out.println("Called3: " + fIN);
 
-                                if (fIN.equals("FIN")) {
-                                    String msg = tcp_transport.receive_command(server_tcp);
-                                    System.out.println("msg: " + msg);
-                                } else {
+                                String msg = tcp_transport.receive_command(server_tcp);
+                                if (fIN.equals("FIN"))
+                                    System.out.println("Server response: " + msg);
+                                else
                                     System.out.println("FIN not received");
-                                }
                             } catch (SocketTimeoutException e) {
-                                System.out.println("Did not receive ACK. Terminating.");
+                                System.out.println("Data transmission terminated prematurely.");
                             }
                         }
                     } else {
-                        if (server_tcp.isConnected()) {
-                            server_tcp.close();
-                        }
-
+                        server_tcp.close();
                         System.out.println("From the Cleint Server");
                         System.out.println("Invalid protocol");
                     }
@@ -129,50 +131,49 @@ public class client {
                         tcp_transport.receiveFile(cache_tcp, dir + "/client_files/" + file_path);
                         cache_tcp.close();
                     } else if (protocol.equals("snw")) {
-                        cache_tcp = new Socket(cache_ip, cache_port);
-                        
-                        snw_transport.send_command(client_snw, InetAddress.getByName(cache_ip),
-                        cache_port, command);
-                        tcp_transport.send_command(cache_tcp, command, cache_ip, cache_port);
+                        try {
+                            cache_tcp = new Socket(cache_ip, cache_port);
+                            client_snw = new DatagramSocket(cache_tcp.getLocalPort());
+                            tcp_transport.send_command(cache_tcp, command, cache_ip, cache_port);
 
-                        String msg = tcp_transport.receive_command(cache_tcp);
-                        System.out.println("msg : " + msg);
-                        long size = get_number(msg);
-                        if (size < 0) {
-                            System.out.println("Invalid file from cache.");
-                            break;
-                        }
-
-                        ArrayList<byte[]> chunks = new ArrayList<>();
-                        client_snw.setSoTimeout(1000);
-                        while (true) {
-                            byte[] r_buf = new byte[1000];
-                            DatagramPacket dp = new DatagramPacket(r_buf, r_buf.length);
-                            client_snw.receive(dp);
-                            byte[] data = dp.getData();
-                            int len = dp.getLength();
-                            size -= len;
-                            System.out.println("len: " + len + " size: " + size);
-
-                            chunks.add(data);
-
-                            InetAddress rcv_addr = dp.getAddress();
-                            int rcv_port = dp.getPort();
-                            snw_transport.send_command(client_snw, rcv_addr, rcv_port, "ACK");
-
-                            if (len < 1000 || size < 1) {
-                                System.out.println("Final Call");
-                                snw_transport.send_command(client_snw, rcv_addr, rcv_port, "FIN");
-                                snw_transport.write_file(chunks, new File(dir + "/client_files/" + file_path));
+                            String msg = tcp_transport.receive_command(cache_tcp);
+                            long size = get_number(msg);
+                            if (size < 0) {
+                                System.out.println("Invalid file from cache.");
                                 break;
                             }
+
+                            ArrayList<byte[]> chunks = new ArrayList<>();
+                            client_snw.setSoTimeout(1000);
+                            while (true) {
+                                byte[] r_buf = new byte[1024];
+                                DatagramPacket dp = new DatagramPacket(r_buf, r_buf.length);
+                                client_snw.receive(dp);
+                                int len = dp.getLength();
+                                size -= len;
+
+                                chunks.add(dp.getData());
+
+                                InetAddress rcv_addr = dp.getAddress();
+                                int rcv_port = dp.getPort();
+                                snw_transport.send_command(client_snw, rcv_addr, rcv_port, "ACK");
+
+                                if (len < 1000 || size < 1) {
+                                    snw_transport.send_command(client_snw, rcv_addr, rcv_port, "FIN");
+                                    snw_transport.write_file(chunks, new File(dir + "/client_files/" + file_path));
+                                    break;
+                                }
+                            }
+
+                            String final_cmd = tcp_transport.receive_command(cache_tcp);
+                            System.out.println("Server response: " + final_cmd);
+                            cache_tcp.close();
+                        } catch (SocketTimeoutException e) {
+                            System.out.println("Data transmission terminated prematurely.");
+                        } catch (Exception e) {
+                            System.out.println("Something went wrong.");
                         }
-                        System.out.println("Called finals");
-                        String msgg = tcp_transport.receive_command(cache_tcp);
-                        System.out.println("msgg: "+ msgg);
-                        cache_tcp.close();
                     } else {
-                        System.out.println("From the Cleint Server");
                         System.out.println("Invalid protocol");
                     }
                 } else {
@@ -180,10 +181,9 @@ public class client {
                     continue;
                 }
             } while (!command.equals("quit"));
-        } catch (
-
-        Exception e) {
-            e.printStackTrace();
+            System.out.println("Exiting program!");
+        } catch (Exception e) {
+            System.out.println("Something went wrong.");
         }
     }
 }
