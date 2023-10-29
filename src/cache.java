@@ -92,12 +92,13 @@ public class cache {
                                     long file_size = file.length();
                                     tcp_transport.send_command(cache_client_socket, "LEN:" + file_size, null, -1);
 
-                                    ArrayList<byte[]> chunks = snw_transport.create_chunk(file, 1000);
                                     try {
                                         cache_snw.setSoTimeout(1000);
-                                        for (int i = 0; i < chunks.size(); i++) {
-                                            byte[] sendData = chunks.get(i);
-                                            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                                        int bytesRead = 0;
+                                        byte[] buf = new byte[1000];
+                                        FileInputStream fIn = new FileInputStream(file);
+                                        while ((bytesRead = fIn.read(buf)) != -1) {
+                                            DatagramPacket sendPacket = new DatagramPacket(buf, bytesRead,
                                                     client_addr, client_port);
                                             cache_snw.send(sendPacket);
 
@@ -111,12 +112,31 @@ public class cache {
                                                 break;
                                             }
                                         }
+                                        fIn.close();
+                                        // try {
+                                        // cache_snw.setSoTimeout(1000);
+                                        // for (int i = 0; i < chunks.size(); i++) {
+                                        // byte[] sendData = chunks.get(i);
+                                        // DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                                        // client_addr, client_port);
+                                        // cache_snw.send(sendPacket);
+
+                                        // String ack = snw_transport.receive_command(cache_snw,
+                                        // client_addr, client_port);
+                                        // if (!ack.equals("ACK")) {
+                                        // System.out.println("Did not receive ACK. Terminating.");
+                                        // tcp_transport.send_command(cache_client_socket,
+                                        // "Did not receive ACK. Terminating.",
+                                        // null, -1);
+                                        // break;
+                                        // }
+                                        // }
 
                                         String fIN = snw_transport.receive_command(cache_snw, client_addr, client_port);
                                         if (!fIN.equals("FIN")) {
                                             tcp_transport.send_command(cache_client_socket,
                                                     "Did not receive ACK. Terminating.", null, -1);
-                                            break;
+                                            continue;
                                         }
 
                                         tcp_transport.send_command(cache_client_socket, "File Delivered from cache.",
@@ -154,6 +174,7 @@ public class cache {
                                         cache_server_snw.receive(dp);
                                         int len = dp.getLength();
                                         fOut.write(dp.getData(), 0, len);
+                                        fOut.flush();
                                         size -= len;
 
                                         chunks.add(dp.getData());
@@ -163,8 +184,6 @@ public class cache {
 
                                         if (len < 1000 || size < 1) {
                                             snw_transport.send_command(cache_server_snw, rcv_addr, rcv_port, "FIN");
-                                            // snw_transport.write_file(chunks,
-                                            // new File(dir + "/cache_files/" + file_name));
                                             break;
                                         }
                                     }
@@ -177,29 +196,35 @@ public class cache {
                                     long file_size = file.length();
                                     tcp_transport.send_command(cache_client_socket, "LEN:" + file_size, null, -1);
 
-                                    ArrayList<byte[]> cache_chunks = snw_transport.create_chunk(file, 1000);
                                     try {
                                         cache_snw.setSoTimeout(1000);
-                                        for (int i = 0; i < cache_chunks.size(); i++) {
-                                            byte[] sendData = cache_chunks.get(i);
-                                            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                                        int bytesRead = 0;
+                                        byte[] buf = new byte[1000];
+                                        FileInputStream fIn = new FileInputStream(file);
+                                        while ((bytesRead = fIn.read(buf)) != -1) {
+                                            DatagramPacket sendPacket = new DatagramPacket(buf, bytesRead,
                                                     client_addr, client_port);
                                             cache_snw.send(sendPacket);
 
                                             String ack = snw_transport.receive_command(cache_snw,
                                                     client_addr, client_port);
                                             if (!ack.equals("ACK")) {
-                                                System.out.println("Did not receive ACK. Terminating.");
                                                 tcp_transport.send_command(cache_client_socket,
-                                                        "File Delivered from origin.",
+                                                        "Did not receive ACK. Terminating.",
                                                         null, -1);
-                                                break;
+                                                System.out.println("Did not receive ACK. Terminating.");
+                                                fIn.close();
+                                                continue;
                                             }
                                         }
+                                        fIn.close();
+                                        
                                         String fIN = snw_transport.receive_command(cache_snw, client_addr, client_port);
-                                        if (fIN.equals("FIN")) {
-                                            System.out.println("");
-                                            break;
+                                        if (!fIN.equals("FIN")) {
+                                            tcp_transport.send_command(cache_client_socket,
+                                                    "Data transmission terminated prematurely.",
+                                                    null, -1);
+                                            continue;
                                         }
                                         tcp_transport.send_command(cache_client_socket, "File Delivered from origin.",
                                                 null, -1);

@@ -30,7 +30,7 @@ public class server {
 
         int port = Integer.parseInt(args[0]);
         String protocol = args[1].toString();
-        
+
         try {
             server_tcp = new ServerSocket(port);
             server_udp = new DatagramSocket(port);
@@ -82,49 +82,58 @@ public class server {
                             long file_size = file.length();
                             tcp_transport.send_command(server_client_socket, "LEN:" + file_size, null, -1);
 
-                            ArrayList<byte[]> chunks = snw_transport.create_chunk(file, 1000);
                             try {
-                                server_udp.setSoTimeout(1000);
-                                for (int i = 0; i < chunks.size(); i++) {
-                                    byte[] sendData = chunks.get(i);
-                                    DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
+                                int bytesRead = 0;
+                                byte[] buf = new byte[1000];
+                                FileInputStream fIn = new FileInputStream(file);
+                                while ((bytesRead = fIn.read(buf)) != -1) {
+                                    DatagramPacket sendPacket = new DatagramPacket(buf, bytesRead,
                                             cache_addr, cache_port);
                                     server_udp.send(sendPacket);
-                                    System.out.println("Send: " + i);
 
                                     String ack = snw_transport.receive_command(server_udp,
                                             cache_addr, cache_port);
-
+                                    if (!ack.equals("ACK")) {
+                                        tcp_transport.send_command(server_client_socket,
+                                                "Did not receive ACK. Terminating.",
+                                                null, -1);
+                                        System.out.println("Did not receive ACK. Terminating.");
+                                        fIn.close();
+                                        continue;
+                                    }
                                 }
+                                fIn.close();
 
                                 String fIN = snw_transport.receive_command(server_udp, cache_addr, cache_port);
+                                if (!fIN.equals("FIN")) {
+                                    tcp_transport.send_command(server_client_socket,
+                                            "Data transmission terminated prematurely.",
+                                            null, -1);
+                                    continue;
+                                }
 
-                                // tcp_transport.send_command(server_client_socket, "File Delivered from
-                                // server.",
-                                // null, -1);
+                                tcp_transport.send_command(server_client_socket, "File Delivered from server.",
+                                        null, -1);
                             } catch (Exception e) {
 
                             }
 
                         } else {
-                            // tcp_transport.send_command(cache_client_socket, "File Not Found in origin",
-                            // null, -1);
                         }
-                        System.out.println("Filename: " + file_name);
                     } else if (command.startsWith("put")) {
                         String file_name = command.split(" ")[1];
                         String msg = in.readLine();
                         long size = get_number(msg);
                         if (size < 0) {
                             tcp_transport.send_command(server_client_socket, "Invalid File Size.", null, -1);
-                            break;
+                            continue;
                         }
 
                         ArrayList<byte[]> chunks = new ArrayList<>();
                         server_udp.setSoTimeout(1000);
                         FileOutputStream fOut = new FileOutputStream(new File(dir + "/server_files/" + file_name));
                         while (true) {
-                            byte[] r_buf = new byte[1024];
+                            byte[] r_buf = new byte[1000];
                             DatagramPacket dp = new DatagramPacket(r_buf, r_buf.length);
                             server_udp.receive(dp);
                             int len = dp.getLength();
@@ -140,7 +149,6 @@ public class server {
 
                             if (len < 1000 || size < 1) {
                                 snw_transport.send_command(server_udp, rcv_addr, rcv_port, "FIN");
-                                // snw_transport.write_file(chunks, new File(dir + "/server_files/" + file_name));
                                 break;
                             }
                         }

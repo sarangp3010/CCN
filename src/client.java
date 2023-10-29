@@ -40,7 +40,14 @@ public class client {
             do {
                 System.out.print("Enter command: ");
                 command = buf_reader.readLine();
-                String file_path = command.split(" ")[1];
+                String file_path = null;
+                try {
+                    file_path = command.split(" ")[1];    
+                } catch (Exception e) {
+                    System.out.println("Error in getting file.");
+                    continue;
+                }
+                
                 if (command.startsWith("put")) {
                     System.out.println("Awaiting server response.");
                     if (protocol.equals("tcp")) {
@@ -72,7 +79,7 @@ public class client {
                                 tcp_transport.send_command(server_tcp, command, server_ip, server_port);
                                 tcp_transport.send_command(server_tcp, "LEN:" + file_size, server_ip, server_port);
 
-                                ArrayList<byte[]> chunks = snw_transport.create_chunk(file, 1000);
+                                // ArrayList<byte[]> chunks = snw_transport.create_chunk(file, 1000);
                                 int bytesRead = 0;
                                 byte[] buf = new byte[1000];
                                 FileInputStream fIn = new FileInputStream(file);
@@ -83,6 +90,7 @@ public class client {
 
                                     String ack = snw_transport.receive_command(client_snw,
                                             InetAddress.getByName(server_ip), server_port);
+
                                     if (!ack.equals("ACK")) {
                                         System.out.println("Did not receive ACK. Terminating.");
                                         break;
@@ -90,23 +98,10 @@ public class client {
                                 }
                                 fIn.close();
 
-                                // for (int i = 0; i < chunks.size(); i++) {
-                                // byte[] sendData = chunks.get(i);
-                                // DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length,
-                                // InetAddress.getByName(server_ip), server_port);
-                                // client_snw.send(sendPacket);
-
-                                // String ack = snw_transport.receive_command(client_snw,
-                                // InetAddress.getByName(server_ip), server_port);
-                                // if (!ack.equals("ACK")) {
-                                // System.out.println("Did not receive ACK. Terminating.");
-                                // break;
-                                // }
-                                // }
-
                                 String fIN = snw_transport.receive_command(client_snw, InetAddress.getByName(server_ip),
                                         server_port);
 
+                                System.out.println("Fin: " + fIN);
                                 String msg = tcp_transport.receive_command(server_tcp);
                                 if (fIN.equals("FIN"))
                                     System.out.println("Server response: " + msg);
@@ -127,7 +122,7 @@ public class client {
                         tcp_transport.send_command(cache_tcp, command, cache_ip, cache_port);
 
                         String msg = tcp_transport.receive_command(cache_tcp);
-                        System.out.println("msg : " + msg);
+                        System.out.println("Server response: " + msg);
                         tcp_transport.receiveFile(cache_tcp, dir + "/client_files/" + file_path);
                         cache_tcp.close();
                     } else if (protocol.equals("snw")) {
@@ -144,12 +139,15 @@ public class client {
                             }
 
                             ArrayList<byte[]> chunks = new ArrayList<>();
+                            FileOutputStream fOut = new FileOutputStream(new File(dir + "/client_files/" + file_path));
                             client_snw.setSoTimeout(1000);
                             while (true) {
-                                byte[] r_buf = new byte[1024];
+                                byte[] r_buf = new byte[1000];
                                 DatagramPacket dp = new DatagramPacket(r_buf, r_buf.length);
                                 client_snw.receive(dp);
                                 int len = dp.getLength();
+                                fOut.write(dp.getData(), 0, len);
+                                fOut.flush();
                                 size -= len;
 
                                 chunks.add(dp.getData());
@@ -160,7 +158,6 @@ public class client {
 
                                 if (len < 1000 || size < 1) {
                                     snw_transport.send_command(client_snw, rcv_addr, rcv_port, "FIN");
-                                    snw_transport.write_file(chunks, new File(dir + "/client_files/" + file_path));
                                     break;
                                 }
                             }
@@ -184,6 +181,7 @@ public class client {
             System.out.println("Exiting program!");
         } catch (Exception e) {
             System.out.println("Something went wrong.");
+            e.printStackTrace();
         }
     }
 }
