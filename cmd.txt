@@ -1,8 +1,24 @@
 scp -r ./tcp_transport.java sp915132@icsi416-fa23.its.albany.edu:/home1/s/s/sp915132/tcp_transport.java
+scp -r ./snw_transport.java sp915132@icsi416-fa23.its.albany.edu:/home1/s/s/sp915132/snw_transport.java
 scp -r ./server.java sp915132@icsi416-fa23.its.albany.edu:/home1/s/s/sp915132/server.java
 scp -r ./client_files/* sp915132@icsi416-fa23.its.albany.edu:/home1/s/s/sp915132/client_files
 
+scp -r ./* sp915132@icsi416-fa23.its.albany.edu:/home1/s/s/sp915132/vm/
 
+
+local
 java server 5555 tcp
 java cache 6666 localhost 5555 tcp
 java client localhost 5555 localhost 6666 tcp
+
+
+vm
+ssh icsi416-fa23.its.albany.edu -l sp915132
+java server 20188 tcp
+java cache 20189 icsi416-fa23.its.albany.edu 20188 tcp
+java client icsi416-fa23.its.albany.edu 20188 localhost 20189 tcp
+
+
+java server 20188 tcp
+java cache 20288 icsi416-fa23.its.albany.edu 20188 tcp
+java client icsi416-fa23.its.albany.edu 20188 icsi416-fa23.its.albany.edu 20288 tcp

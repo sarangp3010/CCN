@@ -94,8 +94,7 @@ public class server {
                             while ((bytesRead = fIn.read(buf)) != -1) {
                                 DatagramPacket sendPacket = new DatagramPacket(buf, bytesRead,
                                         cache_addr, cache_port);
-                                server_udp.send(new DatagramPacket(buf, bytesRead,
-                                cache_addr, cache_port));
+                                server_udp.send(sendPacket);
 
                                 String ack = snw_transport.receive_command(server_udp,
                                         cache_addr, cache_port);

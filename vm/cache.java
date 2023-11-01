@@ -166,6 +166,8 @@ public class cache {
                                     chunks.add(dp.getData());
                                     InetAddress rcv_addr = dp.getAddress();
                                     int rcv_port = dp.getPort();
+                                    System.out.println("rcv_addr: "+ rcv_addr.getHostAddress());
+                                    System.out.println("rcv_port: "+ rcv_port);
                                     snw_transport.send_command(cache_server_snw, rcv_addr, rcv_port, "ACK");
 
                                     if (len < 1000 || size < 1) {
