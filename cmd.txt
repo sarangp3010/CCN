@@ -16,7 +16,7 @@ vm
 ssh icsi416-fa23.its.albany.edu -l sp915132
 java server 20188 tcp
 java cache 20189 icsi416-fa23.its.albany.edu 20188 tcp
-java client icsi416-fa23.its.albany.edu 20188 localhost 20189 tcp
+java client icsi416-fa23.its.albany.edu 20188 icsi416-fa23.its.albany.edu 20189 snw
 
 
 java server 20188 tcp
