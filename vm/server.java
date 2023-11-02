@@ -41,13 +41,13 @@ public class server {
 
         int port = Integer.parseInt(args[0]);
         String protocol = args[1].toString();
-
+        
         // Create both tcp and udp ports and set timeout to the udp port
         server_tcp = new ServerSocket(port);
-        server_udp = new DatagramSocket(port);
+        server_udp = new DatagramSocket(port, InetAddress.getLocalHost());
         server_udp.setSoTimeout(1000);
         while (true) {
-            if (protocol.equals("tcp")) {
+            if (protocol.equals("tcp") || protocol.equals("TCP")) {
                 // Accept the string from the socket.
                 Socket cache_client_socket = server_tcp.accept();
 
@@ -57,30 +57,31 @@ public class server {
                 if (command != null) {
                     // get filename from teh command
                     String file_name = command.split(" ")[1];
-                    if (command.startsWith("get")) {
+                    if (command.startsWith("get") || command.startsWith("GET")) {
                         // clear all teh server_files
                         server_files.clear();
 
                         // By this again refresh the file list of teh server_file.
-                        tcp_transport.getAllFiles(server_files, "server_files");
+                        tcp_transport.get_directory_files(server_files, "server_files");
                         if (server_files.indexOf(file_name) != -1) {
                             // if we have a file in server_files just send that to the cache.
-                            tcp_transport.sendFile(cache_client_socket, dir + "/server_files/" + file_name);
+                            tcp_transport.send_file(cache_client_socket, dir + "/server_files/" + file_name);
                         } else {
                             // else send command that filenot found.
-                            tcp_transport.send_command(cache_client_socket, "File Not Found in origin", null, -1);
+                            tcp_transport.send_command(cache_client_socket, "File Not Found in origin");
                         }
-                    } else if (command.startsWith("put")) {
-                        // for the put just send the command that "File Successfully uploaded" to client.
-                        tcp_transport.send_command(cache_client_socket, "File Successfully uploaded", null, -1);
-                        tcp_transport.receiveFile(cache_client_socket, dir + "/server_files/" + file_name);
+                    } else if (command.startsWith("put") || command.startsWith("PUT")) {
+                        // for the put just send the command that "File Successfully uploaded" to
+                        // client.
+                        tcp_transport.send_command(cache_client_socket, "File Successfully uploaded");
+                        tcp_transport.receive_file(cache_client_socket, dir + "/server_files/" + file_name);
                     } else {
                         System.out.println("From server: Invalid command");
                     }
                 }
                 cache_client_socket.close();
                 in.close();
-            } else if (protocol.equals("snw")) {
+            } else if (protocol.equals("snw") || protocol.equals("SNW")) {
                 // open server_tcp to accept the string/commands from either client or cache.
                 Socket server_client_socket = server_tcp.accept();
 
@@ -92,16 +93,17 @@ public class server {
                 // collect the ip and port for the later use
                 InetAddress cache_addr = server_client_socket.getInetAddress();
                 int cache_port = server_client_socket.getPort();
-                if (command.startsWith("get")) {
+                if (command.startsWith("get") || command.startsWith("GET")) {
                     // Split the file_name from the command
                     String file_name = command.split(" ")[1];
 
-                    // clear files list and re assign it so that it someone manually deleted file it will get detect before read it from the server_files.
+                    // clear files list and re assign it so that it someone manually deleted file it
+                    // will get detect before read it from the server_files.
                     server_files.clear();
                     // call method to get all teh filenames as a arraylist.
-                    tcp_transport.getAllFiles(server_files, "server_files");
+                    tcp_transport.get_directory_files(server_files, "server_files");
 
-                    // if we dont' have a  in server_files folder.
+                    // if we dont' have a in server_files folder.
                     if (server_files.indexOf(file_name) != -1) {
                         // create a new file object.
                         File file = new File(dir + "/server_files/" + file_name);
@@ -114,29 +116,34 @@ public class server {
 
                         // get length and transfer msg like LEN:file_length to the soket
                         long file_size = file.length();
-                        tcp_transport.send_command(server_client_socket, "LEN:" + file_size, null, -1);
+                        tcp_transport.send_command(server_client_socket, "LEN:" + file_size);
 
                         /**
-                         * Now this below process reads the file packets over udp 
+                         * Now this below process reads the file packets over udp
                          * sends that packet to the destination.
                          * receive ACK for each packet and write that packets to the file
                          * untile it completely reads all the packets of that file.
                          */
+
+                        /**
+                         * I faced the wrror while sending the packets and receive at the other end so
+                         * the below stackoverflow artical helped me to resolve this.
+                         * https://stackoverflow.com/questions/23177351/udp-client-server-file-transfer
+                         */
                         try {
-                            int bytesRead = 0;
+                            int read_bytes = 0;
                             byte[] buf = new byte[1000];
                             FileInputStream fIn = new FileInputStream(file);
-                            while ((bytesRead = fIn.read(buf)) != -1) {
-                                DatagramPacket sendPacket = new DatagramPacket(buf, bytesRead,
+                            while ((read_bytes = fIn.read(buf)) != -1) {
+                                DatagramPacket dp = new DatagramPacket(buf, read_bytes,
                                         cache_addr, cache_port);
-                                server_udp.send(sendPacket);
+                                server_udp.send(dp);
 
                                 String ack = snw_transport.receive_command(server_udp,
                                         cache_addr, cache_port);
                                 if (ack == null || !ack.equals("ACK")) {
                                     tcp_transport.send_command(server_client_socket,
-                                            "Did not receive ACK. Terminating.",
-                                            null, -1);
+                                            "Did not receive ACK. Terminating.");
                                     System.out.println("Did not receive ACK. Terminating.");
                                     fIn.close();
                                     break;
@@ -144,25 +151,24 @@ public class server {
                             }
                             fIn.close();
 
-                            // Finally, here read FIN msg if it's not FIN then it terminated and return error msg to the sender socket.
+                            // Finally, here read FIN msg if it's not FIN then it terminated and return
+                            // error msg to the sender socket.
                             String fIN = snw_transport.receive_command(server_udp, cache_addr, cache_port);
                             if (fIN == null || !fIN.equals("FIN")) {
                                 tcp_transport.send_command(server_client_socket,
-                                        "Data transmission terminated prematurely.",
-                                        null, -1);
+                                        "Data transmission terminated prematurely.");
                                 continue;
                             } else {
                                 tcp_transport.send_command(server_client_socket,
-                                        "Data transmission terminated prematurely.",
-                                        null, -1);
+                                        "Data transmission terminated prematurely.");
                             }
 
                         } catch (SocketTimeoutException e) {
                             tcp_transport.send_command(server_client_socket,
-                                    "Data transmission terminated prematurely.", null, -1);
+                                    "Data transmission terminated prematurely.");
                         }
                     }
-                } else if (command.startsWith("put")) {
+                } else if (command.startsWith("put") || command.startsWith("PUT")) {
                     // it it's put then get the file_name.
                     String file_name = command.split(" ")[1];
                     String msg = in.readLine();
@@ -172,7 +178,7 @@ public class server {
 
                     // if it's invalie or <0 return invalid file.
                     if (size < 0) {
-                        tcp_transport.send_command(server_client_socket, "Invalid File Size.", null, -1);
+                        tcp_transport.send_command(server_client_socket, "Invalid File Size.");
                         continue;
                     }
 
@@ -186,10 +192,12 @@ public class server {
                         /**
                          * This below process reads packets from the socket
                          * Then, write it to the file
-                         * Then, collect the data and size and reduce size from the actual size as we have received the data.
+                         * Then, collect the data and size and reduce size from the actual size as we
+                         * have received the data.
                          * now from the packets collet the metadata like port and ip.
                          * and send ACK and FIN msg accordingly.
-                         * Finally, if all completed then trasnfer msg to client like: "File successfully uploaded."
+                         * Finally, if all completed then trasnfer msg to client like: "File
+                         * successfully uploaded."
                          */
                         while (true) {
                             byte[] r_buf = new byte[1000];
@@ -211,17 +219,16 @@ public class server {
                                 break;
                             }
                         }
-                        tcp_transport.send_command(server_client_socket, "File successfully uploaded.", null, -1);
+                        tcp_transport.send_command(server_client_socket, "File successfully uploaded.");
 
                     } catch (SocketTimeoutException e) {
-                        tcp_transport.send_command(server_client_socket, "File successfully uploaded.", null, -1);
+                        tcp_transport.send_command(server_client_socket, "File successfully uploaded.");
                     }
                 }
                 server_client_socket.close();
             } else {
                 System.out.println("From the Server Server");
                 System.out.println("Invalid protocol");
-                continue;
             }
         }
 

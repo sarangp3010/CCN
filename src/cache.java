@@ -68,13 +68,13 @@ public class cache {
                     // first clear and then modify with teh updated current available files in
                     // directory cache_files.
                     cache_files.clear();
-                    tcp_transport.getAllFiles(cache_files, "cache_files");
+                    tcp_transport.get_directory_files(cache_files, "cache_files");
 
                     // if have a file in cache
                     if (cache_files.indexOf(file_name) != -1) {
                         // send file and command to the client.
-                        tcp_transport.send_command(server_client_socket, "File Delivered from cache", null, -1);
-                        tcp_transport.sendFile(server_client_socket, dir + "/cache_files/" + file_name);
+                        tcp_transport.send_command(server_client_socket, "File Delivered from cache");
+                        tcp_transport.send_file(server_client_socket, dir + "/cache_files/" + file_name);
                     } else {
                         // otherwise
 
@@ -82,17 +82,16 @@ public class cache {
                         Socket server_tcp = new Socket(server_ip, server_port);
 
                         // send command to the server.
-                        tcp_transport.send_command(server_tcp, command, server_ip, server_port);
+                        tcp_transport.send_command(server_tcp, command);
 
                         // recieive the file and store it into the cache_files
-                        tcp_transport.receiveFile(server_tcp, dir + "/cache_files/" + file_name);
+                        tcp_transport.receive_file(server_tcp, dir + "/cache_files/" + file_name);
 
                         // send msg "File Delivered from origin" to the client
-                        tcp_transport.send_command(server_client_socket, "File Delivered from origin", null,
-                                -1);
+                        tcp_transport.send_command(server_client_socket, "File Delivered from origin");
 
                         // send file to the client.
-                        tcp_transport.sendFile(server_client_socket, dir + "/cache_files/" + file_name);
+                        tcp_transport.send_file(server_client_socket, dir + "/cache_files/" + file_name);
                     }
                 }
                 server_client_socket.close();
@@ -115,7 +114,7 @@ public class cache {
                 if (command != null) {
                     if (command.startsWith("get")) {
                         // refresh available files in cache_files directory.
-                        tcp_transport.getAllFiles(cache_files, "cache_files");
+                        tcp_transport.get_directory_files(cache_files, "cache_files");
 
                         // if file not available in cache_files.
                         if (cache_files.indexOf(file_name) != -1) {
@@ -132,7 +131,7 @@ public class cache {
                             long file_size = file.length();
 
                             // and send it to the socket like LEN:size
-                            tcp_transport.send_command(cache_client_socket, "LEN:" + file_size, null, -1);
+                            tcp_transport.send_command(cache_client_socket, "LEN:" + file_size);
 
                             /**
                              * Now this below process reads the file packets over udp
@@ -142,11 +141,11 @@ public class cache {
                              */
                             try {
                                 cache_snw.setSoTimeout(1000);
-                                int bytesRead = 0;
+                                int read_bytes = 0;
                                 byte[] buf = new byte[1000];
                                 FileInputStream fIn = new FileInputStream(file);
-                                while ((bytesRead = fIn.read(buf)) != -1) {
-                                    DatagramPacket sendPacket = new DatagramPacket(buf, bytesRead,
+                                while ((read_bytes = fIn.read(buf)) != -1) {
+                                    DatagramPacket sendPacket = new DatagramPacket(buf, read_bytes,
                                             client_addr, client_port);
                                     cache_snw.send(sendPacket);
 
@@ -155,8 +154,7 @@ public class cache {
                                     if (ack == null || !ack.equals("ACK")) {
                                         System.out.println("Did not receive ACK. Terminating.");
                                         tcp_transport.send_command(cache_client_socket,
-                                                "Did not receive ACK. Terminating.",
-                                                null, -1);
+                                                "Did not receive ACK. Terminating.");
                                         break;
                                     }
                                 }
@@ -167,24 +165,21 @@ public class cache {
                                 String fIN = snw_transport.receive_command(cache_snw, client_addr, client_port);
                                 if (!fIN.equals("FIN")) {
                                     tcp_transport.send_command(cache_client_socket,
-                                            "Did not receive ACK. Terminating.", null, -1);
+                                            "Did not receive ACK. Terminating.");
                                     continue;
                                 }
 
                                 // send final command
-                                tcp_transport.send_command(cache_client_socket, "File Delivered from cache.",
-                                        null, -1);
+                                tcp_transport.send_command(cache_client_socket, "File Delivered from cache.");
                                 // if error appears inbetween show it and send it to the client.
                             } catch (SocketTimeoutException e) {
                                 System.out.println("Data transmission terminated prematurely.");
                                 tcp_transport.send_command(cache_client_socket,
-                                        "Data transmission terminated prematurely.",
-                                        null, -1);
+                                        "Data transmission terminated prematurely.");
                             } catch (Exception e) {
                                 System.out.println("Something went wrong.");
                                 tcp_transport.send_command(cache_client_socket,
-                                        "Data transmission terminated prematurely.",
-                                        null, -1);
+                                        "Data transmission terminated prematurely.");
                             }
                         } else {
                             // create new server_tcp to send and receive commands and file.
@@ -194,7 +189,7 @@ public class cache {
                             DatagramSocket cache_server_snw = new DatagramSocket(server_tcp.getLocalPort());
 
                             // send command over tcp
-                            tcp_transport.send_command(server_tcp, command, server_ip, server_port);
+                            tcp_transport.send_command(server_tcp, command);
 
                             // receive teh msg like LEN:size
                             String msg = tcp_transport.receive_command(server_tcp);
@@ -204,7 +199,7 @@ public class cache {
                             if (size < 0) {
                                 System.out.println("Invalid file from cache.");
                                 tcp_transport.send_command(cache_client_socket,
-                                        "File Not Available either server or Cache", null, -1);
+                                        "File Not Available either server or Cache");
                                 continue;
                             }
 
@@ -255,7 +250,7 @@ public class cache {
                                     System.out.println("Invalid file:");
                                 }
                                 long file_size = file.length();
-                                tcp_transport.send_command(cache_client_socket, "LEN:" + file_size, null, -1);
+                                tcp_transport.send_command(cache_client_socket, "LEN:" + file_size);
 
                                 cache_snw.setSoTimeout(1000);
 
@@ -265,11 +260,11 @@ public class cache {
                                  * receive ACK for each packet and write that packets to the file
                                  * untile it completely reads all the packets of that file.
                                  */
-                                int bytesRead = 0;
+                                int read_bytes = 0;
                                 byte[] buf = new byte[1000];
                                 FileInputStream fIn = new FileInputStream(file);
-                                while ((bytesRead = fIn.read(buf)) != -1) {
-                                    DatagramPacket sendPacket = new DatagramPacket(buf, bytesRead,
+                                while ((read_bytes = fIn.read(buf)) != -1) {
+                                    DatagramPacket sendPacket = new DatagramPacket(buf, read_bytes,
                                             client_addr, client_port);
                                     cache_snw.send(sendPacket);
 
@@ -277,8 +272,7 @@ public class cache {
                                             client_addr, client_port);
                                     if (ack == null || !ack.equals("ACK")) {
                                         tcp_transport.send_command(cache_client_socket,
-                                                "Did not receive ACK. Terminating.",
-                                                null, -1);
+                                                "Did not receive ACK. Terminating.");
                                         System.out.println("Did not receive ACK. Terminating.");
                                         fIn.close();
                                         continue;
@@ -289,24 +283,20 @@ public class cache {
                                 String fIN = snw_transport.receive_command(cache_snw, client_addr, client_port);
                                 if (!fIN.equals("FIN")) {
                                     tcp_transport.send_command(cache_client_socket,
-                                            "Data transmission terminated prematurely.",
-                                            null, -1);
+                                            "Data transmission terminated prematurely.");
                                     continue;
                                 }
-                                tcp_transport.send_command(cache_client_socket, "File Delivered from origin.",
-                                        null, -1);
+                                tcp_transport.send_command(cache_client_socket, "File Delivered from origin.");
                             } catch (SocketTimeoutException e) {
                                 // When timeout appears this block invokes.
                                 System.out.println("Data transmission terminated prematurely.");
                                 tcp_transport.send_command(cache_client_socket,
-                                        "Data transmission terminated prematurely.",
-                                        null, -1);
+                                        "Data transmission terminated prematurely.");
                             } catch (Exception e) {
                                 // for any other exception appears this block invokes.
                                 System.out.println("Data transmission terminated prematurely.");
                                 tcp_transport.send_command(cache_client_socket,
-                                        "Data transmission terminated prematurely.",
-                                        null, -1);
+                                        "Data transmission terminated prematurely.");
                             }
                         }
                     }

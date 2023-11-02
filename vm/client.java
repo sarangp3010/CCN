@@ -50,8 +50,7 @@ public class client {
             command = buf_reader.readLine();
             String file_path = null;
 
-            // By this exception if there's an eception I will return user to enter the
-            // command again.
+            // By this exception if there's an eception I will return user to enter the command again.
             // The error could be anything here related to command only
             try {
                 file_path = command.split(" ")[1];
@@ -60,9 +59,9 @@ public class client {
                 continue;
             }
 
-            if (command.startsWith("put")) {
+            if (command.startsWith("put") || command.startsWith("PUT")) {
                 System.out.println("Awaiting server response.");
-                if (protocol.equals("tcp")) {
+                if (protocol.equals("tcp") || protocol.equals("TCP")) {
                     // Here it creates the file oject that is stored at the client_files.
                     File file = new File(dir + "/client_files/" + file_path);
                     // If any error in gettign file or invalid file simply return form that.
@@ -79,17 +78,17 @@ public class client {
                         // and command.
                         // the additional arguments are if the Printwriter stream is closed I'll rebind
                         // it to the server
-                        tcp_transport.send_command(server_tcp, command, server_ip, server_port);
+                        tcp_transport.send_command(server_tcp, command);
 
                         // receive msg from the serve to show to the user.
                         String msg = tcp_transport.receive_command(server_tcp);
-                        tcp_transport.sendFile(server_tcp, dir + "/client_files/" + file_path);
+                        tcp_transport.send_file(server_tcp, dir + "/client_files/" + file_path);
                         System.out.println("Server response: " + msg);
 
                         // I had faced an issue of open tcp port so that I closed the port.
                         server_tcp.close();
                     }
-                } else if (protocol.equals("snw")) {
+                } else if (protocol.equals("snw") || protocol.equals("SNW")) {
                     // create the file object of the path.
                     File file = new File(dir + "/client_files/" + file_path);
 
@@ -111,10 +110,10 @@ public class client {
 
                             // set 1ms timeout to the socket
                             client_snw.setSoTimeout(1000);
-                            tcp_transport.send_command(server_tcp, command, server_ip, server_port);
-                            tcp_transport.send_command(server_tcp, "LEN:" + file_size, server_ip, server_port);
+                            tcp_transport.send_command(server_tcp, command);
+                            tcp_transport.send_command(server_tcp, "LEN:" + file_size);
 
-                            int bytesRead = 0;
+                            int read_bytes = 0;
 
                             /**
                              * Now this below process reads the file packets over udp
@@ -124,8 +123,8 @@ public class client {
                              */
                             byte[] buf = new byte[1000];
                             FileInputStream fIn = new FileInputStream(file);
-                            while ((bytesRead = fIn.read(buf)) != -1) {
-                                DatagramPacket sendPacket = new DatagramPacket(buf, bytesRead,
+                            while ((read_bytes = fIn.read(buf)) != -1) {
+                                DatagramPacket sendPacket = new DatagramPacket(buf, read_bytes,
                                         InetAddress.getByName(server_ip), server_port);
                                 client_snw.send(sendPacket);
 
@@ -162,30 +161,30 @@ public class client {
                     System.out.println("From the Cleint Server");
                     System.out.println("Invalid protocol");
                 }
-            } else if (command.startsWith("get")) {
+            } else if (command.startsWith("get") || command.startsWith("GET")) {
                 // if command starts with get
-                if (protocol.equals("tcp")) {
+                if (protocol.equals("tcp") || protocol.equals("TCP")) {
                     // bind cach tcp to send command andreceive file over tcp.
                     cache_tcp = new Socket(cache_ip, cache_port);
 
                     // send command received from the user.
-                    tcp_transport.send_command(cache_tcp, command, cache_ip, cache_port);
+                    tcp_transport.send_command(cache_tcp, command);
 
                     // get file and success/error msg from the server.
                     String msg = tcp_transport.receive_command(cache_tcp);
                     System.out.println("Server response: " + msg);
-                    tcp_transport.receiveFile(cache_tcp, dir + "/client_files/" + file_path);
+                    tcp_transport.receive_file(cache_tcp, dir + "/client_files/" + file_path);
 
                     // finally close cache tcp socket for the client.
                     cache_tcp.close();
-                } else if (protocol.equals("snw")) {
+                } else if (protocol.equals("snw") || protocol.equals("SNW")) {
                     try {
                         // bind the cache tcp and UDP to send commands and file respectively.
                         cache_tcp = new Socket(cache_ip, cache_port);
                         client_snw = new DatagramSocket(cache_tcp.getLocalPort());
 
                         // using tcp send command from teh user to cache.
-                        tcp_transport.send_command(cache_tcp, command, cache_ip, cache_port);
+                        tcp_transport.send_command(cache_tcp, command);
 
                         // receive msg from the cache like LEN:size
                         String msg = tcp_transport.receive_command(cache_tcp);
@@ -253,6 +252,5 @@ public class client {
             }
         } while (!command.equals("quit"));
         System.out.println("Exiting program!");
-
     }
 }
