@@ -253,6 +253,5 @@ public class client {
             }
         } while (!command.equals("quit"));
         System.out.println("Exiting program!");
-
     }
 }
