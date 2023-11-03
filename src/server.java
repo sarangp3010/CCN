@@ -41,8 +41,7 @@ public class server {
 
         int port = Integer.parseInt(args[0]);
         String protocol = args[1].toString();
-        
-        System.out.println("InetAddress.getLocalHost()" + InetAddress.getLocalHost());
+
         // Create both tcp and udp ports and set timeout to the udp port
         server_tcp = new ServerSocket(port);
         server_udp = new DatagramSocket(port);
@@ -118,6 +117,7 @@ public class server {
                         // get length and transfer msg like LEN:file_length to the soket
                         long file_size = file.length();
                         tcp_transport.send_command(server_client_socket, "LEN:" + file_size);
+                        String cn = snw_transport.receive_command(server_udp, cache_addr, cache_port);
 
                         /**
                          * Now this below process reads the file packets over udp
@@ -127,7 +127,7 @@ public class server {
                          */
 
                         /**
-                         * I faced the wrror while sending the packets and receive at the other end so
+                         * I faced the error while sending the packets and receive at the other end so
                          * the below stackoverflow artical helped me to resolve this.
                          * https://stackoverflow.com/questions/23177351/udp-client-server-file-transfer
                          */
@@ -165,9 +165,10 @@ public class server {
                             }
 
                         } catch (SocketTimeoutException e) {
-                            
                             tcp_transport.send_command(server_client_socket,
                                     "Data transmission terminated prematurely.");
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
                     }
                 } else if (command.startsWith("put") || command.startsWith("PUT")) {
@@ -225,6 +226,7 @@ public class server {
 
                     } catch (SocketTimeoutException e) {
                         tcp_transport.send_command(server_client_socket, "File successfully uploaded.");
+                        e.printStackTrace();
                     }
                 }
                 server_client_socket.close();

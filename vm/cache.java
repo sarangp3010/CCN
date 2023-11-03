@@ -140,7 +140,7 @@ public class cache {
                              * until it completely reads all the packets of that file.
                              */
                             try {
-                                cache_snw.setSoTimeout(1000);
+                                cache_snw.setSoTimeout(10000);
                                 int read_bytes = 0;
                                 byte[] buf = new byte[1000];
                                 FileInputStream fIn = new FileInputStream(file);
@@ -193,6 +193,7 @@ public class cache {
 
                             // receive teh msg like LEN:size
                             String msg = tcp_transport.receive_command(server_tcp);
+                            snw_transport.send_command(cache_server_snw, InetAddress.getByName(server_ip), server_port, "Hello server");
 
                             // check for the valid file size.
                             long size = get_number(msg);
@@ -205,7 +206,7 @@ public class cache {
 
                             // set chunks and set timeout
                             ArrayList<byte[]> chunks = new ArrayList<>();
-                            cache_server_snw.setSoTimeout(1000);
+                            cache_server_snw.setSoTimeout(10000);
 
                             /**
                              * This try catch mainly first receive file from the server and then send this
@@ -252,7 +253,7 @@ public class cache {
                                 long file_size = file.length();
                                 tcp_transport.send_command(cache_client_socket, "LEN:" + file_size);
 
-                                cache_snw.setSoTimeout(1000);
+                                cache_snw.setSoTimeout(10000);
 
                                 /**
                                  * Now this below process reads the file packets over udp

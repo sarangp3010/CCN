@@ -109,7 +109,7 @@ public class client {
                             client_snw = new DatagramSocket(server_tcp.getLocalPort());
 
                             // set 1ms timeout to the socket
-                            client_snw.setSoTimeout(1000);
+                            client_snw.setSoTimeout(10000);
                             tcp_transport.send_command(server_tcp, command);
                             tcp_transport.send_command(server_tcp, "LEN:" + file_size);
 
@@ -203,15 +203,17 @@ public class client {
 
                         // fOut will be store data to the given file.
                         FileOutputStream fOut = new FileOutputStream(new File(dir + "/client_files/" + file_path));
-                        client_snw.setSoTimeout(1000);
+                        client_snw.setSoTimeout(10000);
 
                         /**
                          * This below process reads packets from the socket
                          * Then, write it to the file
-                         * Then, collect the data and size and reduce size from the actual size as we have received the data.
+                         * Then, collect the data and size and reduce size from the actual size as we
+                         * have received the data.
                          * now from the packets collet the metadata like port and ip.
                          * and send ACK and FIN msg accordingly.
-                         * Finally, if all completed then trasnfer msg to client like: "File successfully uploaded."
+                         * Finally, if all completed then trasnfer msg to client like: "File
+                         * successfully uploaded."
                          */
                         while (true) {
                             byte[] r_buf = new byte[1000];
